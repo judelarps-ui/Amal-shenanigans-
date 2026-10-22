@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Amal Shenanigans</title>
+    <!-- PeerJS for P2P multiplayer -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0b0f19;
+            --panel-bg: #111827;
+            --panel-border: #1f293d;
+            --card-bg: #131c2e;
+            --primary: #ec4899;
+            --primary-hover: #db2777;
+            --accent-gold: #f59e0b;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            padding: 12px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* Screen Shake Animation */
+        .shake-impact {
+            animation: shake 0.35s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        .container { max-width: 500px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 12px; position: relative; }
+        .panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; padding: 14px; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--panel-border); padding-bottom: 10px; }
+
+        .player-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-weight: bold; font-size: 13px; }
+        .hp-bar-bg { background: #1a202c; border-radius: 999px; height: 12px; overflow: hidden; position: relative; width: 100%; border: 1px solid #374151; }
+        .hp-bar-fill { height: 100%; transition: width 0.4s ease-out; border-radius: 999px; }
+        .gradient-hp { background: linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%); }
+
+        .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+
+        .empty-slot {
+            border: 2px dashed #2d3748;
+            border-radius: 14px;
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4a5568;
+            font-size: 13px;
+            font-weight: 700;
+            background: rgba(15, 23, 42, 0.4);
+        }
+
+        .vertical-card {
+            background: var(--card-bg);
+            border: 2px solid #2d3748;
+            border-radius: 14px;
+            height: 160px;
+            padding: 8px 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .vertical-card:hover { transform: translateY(-3px); }
+
+        .tier-border-S { border-color: #f59e0b; box-shadow: 0 0 10px rgba(245, 158, 11, 0.35); }
+        .tier-border-A { border-color: #8b5cf6; box-shadow: 0 0 10px rgba(139, 92, 246, 0.35); }
+        .tier-border-B { border-color: #ec4899; box-shadow: 0 0 10px rgba(236, 72, 153, 0.35); }
+        .tier-border-C { border-color: #06b6d4; box-shadow: 0 0 10px rgba(6, 182, 212, 0.35); }
+        .tier-border-D { border-color: #6b7280; }
+        .tier-border-FUSION { border-color: #ef4444; box-shadow: 0 0 14px rgba(239, 68, 68, 0.6); }
+
+        .card-top-row { display: flex; justify-content: space-between; width: 100%; font-size: 10px; font-weight: 900; }
+        .card-tier-tag { font-size: 10px; font-weight: 900; }
+        .card-tier-tag.S { color: #f59e0b; }
+        .card-tier-tag.A { color: #a78bfa; }
+        .card-tier-tag.B { color: #f472b6; }
+        .card-tier-tag.C { color: #22d3ee; }
+        .card-tier-tag.D { color: #9ca3af; }
+        .card-tier-tag.FUSION { color: #f87171; }
+
+        .card-atk-tag { color: #f3f4f6; font-size: 10px; font-weight: 800; }
+        .card-title-main { font-size: 12px; font-weight: 800; color: #fff; margin: auto 0; line-height: 1.2; }
+        .card-hp-footer { font-size: 10px; font-weight: 700; color: #9ca3af; }
+
+        .ability-ready-pulse { animation: cardPulse 1.2s infinite alternate; }
+        @keyframes cardPulse { from { box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); } to { box-shadow: 0 0 18px rgba(245, 158, 11, 0.9); } }
+
+        .support-row { display: flex; gap: 6px; justify-content: flex-end; }
+        .support-card { width: 36px; height: 46px; border-radius: 8px; background: linear-gradient(135deg, #3b0764, #831843); border: 2px solid #ec4899; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; cursor: pointer; color: #f472b6; transition: 0.2s; }
+        .support-card:hover:not(.used) { transform: translateY(-2px); box-shadow: 0 0 10px #ec4899; }
+        .support-card.used { background: #1f2937; border-color: #374151; color: #4b5563; cursor: default; }
+
+        .btn { background: var(--primary); color: #fff; border: none; padding: 10px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
+        .btn:hover:not(:disabled) { background: var(--primary-hover); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-green { background: var(--accent-green); }
+        .btn-blue { background: var(--accent-blue); }
+        .btn-dark { background: #374151; }
+        .btn-gold { background: var(--accent-gold); color: #000; }
+        .btn-fusion { background: #ef4444; color: #fff; }
+
+        .banner-text { background: #1e1b4b; border: 1px solid #6366f1; color: #f59e0b; padding: 8px; border-radius: 8px; font-size: 11px; font-weight: bold; text-align: center; }
+
+        .log-box { background: #080b12; border: 1px solid #1a2336; border-radius: 8px; padding: 8px; height: 80px; overflow-y: auto; font-family: monospace; font-size: 10px; color: #a1a1aa; display: flex; flex-direction: column; gap: 2px; }
+
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+        .modal-content { background: var(--panel-bg); border: 1px solid var(--panel-border); padding: 20px; border-radius: 16px; max-width: 400px; width: 100%; max-height: 85vh; overflow-y: auto; }
+        .hidden { display: none !important; }
+
+        .rules-item { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--panel-border); }
+        .rules-item h4 { color: var(--accent-gold); font-size: 13px; margin-bottom: 3px; }
+        .rules-item p, .rules-item li { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+        .rules-item ul { padding-left: 16px; margin-top: 4px; }
+
+        /* CUTSCENE OVERLAY SYSTEM */
+        #cutsceneOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: rgba(0, 0, 0, 0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #cutsceneOverlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .cutscene-title {
+            font-size: 26px;
+            font-weight: 900;
+            color: #f59e0b;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+            animation: zoomIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .cutscene-subtitle {
+            font-size: 14px;
+            color: #e2e8f0;
+            margin-top: 10px;
+            font-weight: 700;
+            animation: fadeInUp 0.5s ease;
+        }
+        .cutscene-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            animation: pulseGlow 1s infinite alternate;
+        }
+
+        /* FLOATING TEXT ANIMATIONS */
+        .floating-text {
+            position: absolute;
+            font-weight: 900;
+            font-size: 18px;
+            pointer-events: none;
+            z-index: 50;
+            animation: floatUp 1s ease-out forwards;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-40px) scale(1.3); }
+        }
+
+        /* SLASH EFFECT */
+        .slash-effect {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: linear-gradient(135deg, transparent 45%, rgba(239, 68, 68, 0.8) 50%, transparent 55%);
+            animation: slashAnim 0.3s ease-out forwards;
+            z-index: 40;
+            border-radius: 12px;
+        }
+        @keyframes slashAnim {
+            0% { opacity: 0; transform: scale(0.8); }
+            50% { opacity: 1; }
+            100% { opacity: 0; transform: scale(1.1); }
+        }
+
+        @keyframes zoomIn {
+            from { transform: scale(0.3); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes fadeInUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes pulseGlow {
+            from { transform: scale(0.95); filter: drop-shadow(0 0 10px rgba(236,72,153,0.5)); }
+            to { transform: scale(1.1); filter: drop-shadow(0 0 25px rgba(236,72,153,0.9)); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- CUTSCENE OVERLAY -->
+    <div id="cutsceneOverlay">
+        <div id="cutsceneIcon" class="cutscene-icon">🔮</div>
+        <div id="cutsceneTitle" class="cutscene-title">SPECIAL ABILITY</div>
+        <div id="cutsceneSub" class="cutscene-subtitle">ULTIMATE ATTACK UNLEASHED!</div>
+    </div>
+
+    <div class="container" id="mainAppContainer">
+        <!-- Main Header -->
+        <div class="panel header">
+            <div>
+                <h1 style="font-size: 20px; color: var(--primary); font-weight: 900;">AMAL SHENANIGANS</h1>
+                <p style="font-size: 10px; color: var(--text-muted);">Tactical School Card Battle Game</p>
+            </div>
+            <div id="statusBadge" style="font-size: 10px; color: var(--accent-gold); font-weight: bold; background: #1c2536; padding: 4px 10px; border-radius: 6px; border: 1px solid #2e3a54;">Main Menu</div>
+        </div>
+
+        <!-- MAIN MENU PANEL -->
+        <div id="lobbyScreen" class="panel" style="text-align: center; padding: 28px 16px;">
+            <h2 style="font-size: 18px; margin-bottom: 6px;">Welcome to the Arena</h2>
+            <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 20px;">Select game mode to battle!</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px; max-width: 280px; margin: 0 auto;">
+                <button class="btn btn-green" onclick="GameEngine.startVsAI()">⚔️ Play Vs AI Bot</button>
+                <button class="btn btn-blue" onclick="GameEngine.openModal('roomModal')">🌐 Online Multiplayer Room</button>
+                <button class="btn btn-dark" onclick="GameEngine.openModal('rulesModal')">📖 Rules & Guide</button>
+            </div>
+        </div>
+
+        <!-- BATTLE SCREEN -->
+        <div id="gameScreen" class="hidden" style="display: flex; flex-direction: column; gap: 10px;">
+            
+            <!-- OPPONENT FIELD -->
+            <div class="panel" id="opponentPanel">
+                <div class="player-row">
+                    <span id="p2NameLabel" style="color: #f3f4f6;">👤 Opponent</span>
+                    <span style="font-family: monospace;">HP: <b id="p2HpText" style="color:#f3f4f6;">3000</b><span style="color:#6b7280;">/3000</span></span>
+                </div>
+                <div class="hp-bar-bg" style="margin-bottom: 12px;">
+                    <div id="p2HpBar" class="hp-bar-fill gradient-hp" style="width: 100%;"></div>
+                </div>
+
+                <div id="p2ActiveBoard" class="card-grid"></div>
+            </div>
+
+            <!-- TURN BANNER & NOTIFICATIONS -->
+            <div class="banner-text" id="turnBannerText">
+                Match Started! Tap cards from your hand to deploy.
+            </div>
+
+            <div id="abilityBanner" class="banner-text hidden" style="color: #4ade80; border-color: #22c55e;"></div>
+
+            <!-- PLAYER FIELD -->
+            <div class="panel" id="playerPanel" style="box-shadow: 0 0 16px rgba(245, 158, 11, 0.15);">
+                <div id="p1ActiveBoard" class="card-grid" style="margin-bottom: 12px;"></div>
+
+                <div class="hp-bar-bg" style="margin-bottom: 6px;">
+                    <div id="p1HpBar" class="hp-bar-fill gradient-hp" style="width: 100%;"></div>
+                </div>
+                <div class="player-row" style="margin-bottom: 0;">
+                    <span style="color: #f3f4f6;">👤 You (<span id="myRoleLabel">Player 1</span>)</span>
+                    <span style="font-family: monospace;">HP: <b id="p1HpText" style="color:#10b981;">3000</b><span style="color:#6b7280;">/3000</span></span>
+                </div>
+            </div>
+
+            <!-- CONTROLS & SUPPORT TRAPS -->
+            <div class="panel" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; gap: 8px;">
+                <button id="endTurnBtn" class="btn btn-green" style="width: auto; padding: 6px 14px;" onclick="GameEngine.endTurn()">End Turn</button>
+                <button id="fusionBtn" class="btn btn-fusion" style="width: auto; padding: 6px 12px; font-size: 11px; display: none;" onclick="GameEngine.triggerNightmareFusion()">🔮 Fuse Duo</button>
+                <div id="p1Supports" class="support-row"></div>
+            </div>
+
+            <!-- LOG BOX -->
+            <div class="panel" style="padding: 8px;">
+                <div id="logBox" class="log-box"></div>
+            </div>
+
+            <!-- RESERVE HAND -->
+            <div class="panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 11px; font-weight: 800; color: #f3f4f6;">🖐️ Reserve Hand (Tap card to deploy)</span>
+                    <span style="font-size: 10px; font-weight: 900; color: #f59e0b;">12% S-TIER CHANCE</span>
+                </div>
+                <div id="p1HandBoard" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modals System -->
+    <div id="targetModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 10px; color: var(--text-main); text-align: center;">Select Attack Target</h3>
+            <div id="targetList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            <button class="btn btn-dark" style="margin-top: 12px;" onclick="GameEngine.closeModal('targetModal')">Cancel</button>
+        </div>
+    </div>
+
+    <div id="healModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 6px; color: var(--accent-green); text-align: center;">💖 Heal Support</h3>
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; text-align: center;">Choose target to restore HP:</p>
+            <div id="healList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            <button class="btn btn-dark" style="margin-top: 12px;" onclick="GameEngine.closeModal('healModal')">Cancel</button>
+        </div>
+    </div>
+
+    <div id="piModal" class="modal hidden">
+        <div class="modal-content" style="text-align: center;">
+            <h3 style="color: var(--accent-gold); margin-bottom: 6px;">📐 Mr. Brahim's Pi Recitation!</h3>
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">Type correct digits after "3." (e.g., 14159...). Each correct digit adds +20% ATK!</p>
+            <input type="text" id="piInput" placeholder="14159..." style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #374151; background: #080b12; color: #fff; font-size: 14px; font-family: monospace; text-align: center; margin-bottom: 12px;">
+            <button class="btn btn-green" onclick="GameEngine.submitPi()">Declare Pi Digits</button>
+        </div>
+    </div>
+
+    <div id="roomModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 8px; color: var(--accent-blue); text-align: center;">🌐 Online Multiplayer Room</h3>
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 16px; text-align: center;">Create a room or enter a 4-digit code to join a friend online.</p>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="btn btn-green" style="padding:10px;" onclick="GameEngine.hostOnlineRoom()">Host New Room</button>
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                    <input type="text" id="peerCodeInput" maxlength="4" placeholder="4-Digit Code" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid #374151; background: #080b12; color: #fff; font-size: 14px; text-align: center; outline: none; font-weight: bold; letter-spacing: 2px;">
+                    <button class="btn btn-blue" style="width: auto; padding: 0 16px;" onclick="GameEngine.joinOnlineRoom()">Join</button>
+                </div>
+            </div>
+            <button class="btn btn-dark" style="margin-top: 16px;" onclick="GameEngine.closeModal('roomModal')">Close</button>
+        </div>
+    </div>
+
+    <!-- FULL CHARACTER & RULES GUIDE MODAL -->
+    <div id="rulesModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 12px; color: var(--primary); text-align: center;">📖 Game Guide & All Character Abilities</h3>
+            
+            <div class="rules-item">
+                <h4>🔮 Nightmare Duo Fusion</h4>
+                <p>When you have both <b>Miss Rita</b> and <b>Miss Joumana</b> active on your board, tap the <b>🔮 Fuse Duo</b> button to sacrifice both and summon the supreme <b>Nightmare Duo Fusion</b> entity (2000 HP, 900 ATK, 1-turn Cooldown)! Ability: Heals +500 HP and permanently boosts ATK by +300!</p>
+            </div>
+
+            <div class="rules-item">
+                <h4>🎓 Complete Fighter Roster & Abilities</h4>
+                <ul>
+                    <li><b>👑 Miss Ghizel (S-Tier):</b> <i>Principal Decree</i> — Heals herself for 25% Max HP and triples (3x) her ATK stat for 1 turn. (Cooldown: 3 Turns)</li>
+                    <li><b>📐 Mr. Brahim (S-Tier):</b> <i>Pi Recitation</i> — Recite digits of Pi after "3." Each correct digit adds a +20% multiplier to current ATK! (Cooldown: 2 Turns)</li>
+                    <li><b>🛑 Miss Rawa (A-Tier):</b> <i>Shut Up!</i> — Silences and freezes all enemy cards and turn actions for 2 full turns. (Cooldown: 2 Turns)</li>
+                    <li><b>📝 Miss Lila (A-Tier):</b> <i>Written Quiz</i> — Steals 50% of the active enemy fighter's current HP and restores it to herself. (Cooldown: 2 Turns)</li>
+                    <li><b>⚠️ Miss Joumana (B-Tier):</b> <i>Warning Slip</i> — Sacrifices 30% of her current HP to empower herself with a +70% stat boost. Component for Nightmare Duo Fusion. (Cooldown: 3 Turns)</li>
+                    <li><b>🌿 Miss Lilan (B-Tier):</b> <i>Cloud Plants</i> — Instantly buffs her strike power with +400 bonus attack damage. (Cooldown: 2 Turns)</li>
+                    <li><b>🐸 Mr. Kameel (C-Tier):</b> <i>Frog Eyes</i> — Doubles his attack power and skips the enemy's upcoming turn. (Cooldown: 2 Turns)</li>
+                    <li><b>✝️ Miss Rita (C-Tier):</b> Component card required for summoning the <b>Nightmare Duo Fusion</b> entity. (Cooldown: 3 Turns)</li>
+                    <li><b>🗣️ Mr. Maher (D-Tier):</b> <i>Talks Too Much</i> — Forces the enemy to forfeit their next turn through sheer relentless talking. (Cooldown: 2 Turns)</li>
+                    <li><b>⚡ Miss Nada (D-Tier):</b> <i>Double Strike</i> — Instantly doubles her attack output for a heavy strike. (Cooldown: 4 Turns)</li>
+                </ul>
+            </div>
+
+            <div class="rules-item">
+                <h4>⚡ Support Traps</h4>
+                <ul>
+                    <li>💖 <b>Heal:</b> Restores +600 HP to player or chosen fighter.</li>
+                    <li>💨 <b>Evade:</b> Dodges incoming opponent strike.</li>
+                    <li>🌀 <b>Merge:</b> Heals active friendly units.</li>
+                    <li>⚡ <b>Extra Credit:</b> Grants +200 ATK bonus to active cards.</li>
+                    <li>🛑 <b>Detention Slip:</b> Forces enemy turn skip.</li>
+                    <li>🔔 <b>School Bell:</b> Instantly resets ability cooldown timers.</li>
+                </ul>
+            </div>
+
+            <button class="btn btn-dark" style="margin-top: 8px;" onclick="GameEngine.closeModal('rulesModal')">Close Guide</button>
+        </div>
+    </div>
+
+    <div id="gameOverModal" class="modal hidden">
+        <div class="modal-content" style="text-align: center;">
+            <h2 id="winTitle" style="font-size: 24px; margin-bottom: 6px;">VICTORY!</h2>
+            <p id="winSub" style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;"></p>
+            <div id="gameStats" style="font-size: 11px; color: var(--accent-gold); margin-bottom: 16px; font-family: monospace;"></div>
+            <button class="btn btn-green" onclick="GameEngine.resetToMenu()">Return to Main Menu</button>
+        </div>
+    </div>
+
+    <script>
+        const SoundFX = {
+            ctx: null,
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            play(type) {
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    const now = this.ctx.currentTime;
+
+                    if (type === 'attack') {
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(300, now);
+                        osc.frequency.exponentialRampToValueAtTime(80, now + 0.15);
+                        gain.gain.setValueAtTime(0.3, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                        osc.start(now); osc.stop(now + 0.15);
+                    } else if (type === 'ability') {
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(400, now);
+                        osc.frequency.exponentialRampToValueAtTime(800, now + 0.25);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+                        osc.start(now); osc.stop(now + 0.25);
+                    } else if (type === 'cutscene') {
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(150, now);
+                        osc.frequency.exponentialRampToValueAtTime(600, now + 0.6);
+                        gain.gain.setValueAtTime(0.4, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.6);
+                        osc.start(now); osc.stop(now + 0.6);
+                    }
+                } catch(e) {}
+            }
+        };
+
+        const FIGHTER_ROSTER = [
+            { id: 'ghizel', name: 'Miss Ghizel', tier: 'S', hp: 1000, maxHp: 1000, atk: 1000, cooldown: 3, timer: 3, icon: '👑', desc: 'Principal Decree: Heals 25% max HP & 3x DMG for 1 turn.' },
+            { id: 'brahim', name: 'Mr. Brahim', tier: 'S', hp: 1000, maxHp: 1000, atk: 500, cooldown: 2, timer: 2, icon: '📐', desc: 'Pi: Recite correct Pi digits for +20% DMG per digit.' },
+            { id: 'rawa', name: 'Miss Rawa', tier: 'A', hp: 2000, maxHp: 2000, atk: 400, cooldown: 2, timer: 2, icon: '🛑', desc: 'Shut Up: Stops opponent actions for 2 turns.' },
+            { id: 'lila', name: 'Miss Lila', tier: 'A', hp: 800, maxHp: 800, atk: 500, cooldown: 2, timer: 2, icon: '📝', desc: 'Written Quiz: Steals 50% of enemy current HP.' },
+            { id: 'joumana', name: 'Miss Joumana', tier: 'B', hp: 800, maxHp: 800, atk: 400, cooldown: 3, timer: 3, icon: '⚠️', desc: 'Warning: Sacrifices 30% HP for +70% stats boost.' },
+            { id: 'lilan', name: 'Miss Lilan', tier: 'B', hp: 700, maxHp: 700, atk: 300, cooldown: 2, timer: 2, icon: '🌿', desc: 'Cloud Plants: Deals +400 extra damage strike.' },
+            { id: 'kameel', name: 'Mr. Kameel', tier: 'C', hp: 650, maxHp: 650, atk: 200, cooldown: 2, timer: 2, icon: '🐸', desc: 'Frog Eyes: Skips enemy turn & doubles damage.' },
+            { id: 'rita', name: 'Miss Rita', tier: 'C', hp: 600, maxHp: 600, atk: 200, cooldown: 3, timer: 3, icon: '✝️', desc: 'Component for Nightmare Duo Fusion.' },
+            { id: 'maher', name: 'Mr. Maher', tier: 'D', hp: 500, maxHp: 500, atk: 50, cooldown: 2, timer: 2, icon: '🗣️', desc: 'Talks Too Much: Forces enemy to skip turn.' },
+            { id: 'nada', name: 'Miss Nada', tier: 'D', hp: 200, maxHp: 200, atk: 200, cooldown: 4, timer: 4, icon: '⚡', desc: 'Double Attack: Unleashes a double strike.' }
+        ];
+
+        const SUPPORT_TYPES = [
+            { id: 'heal', symbol: '💖', name: 'Heal Support' },
+            { id: 'evade', symbol: '💨', name: 'Evade Support' },
+            { id: 'merge', symbol: '🌀', name: 'Merge Support' },
+            { id: 'extra', symbol: '⚡', name: 'Extra Credit' },
+            { id: 'detention', symbol: '🛑', name: 'Detention Slip' },
+            { id: 'bell', symbol: '🔔', name: 'School Bell' }
+        ];
+
+        const GameEngine = {
+            state: {
+                p1Hp: 3000, p2Hp: 3000,
+                p1Hand: [], p2Hand: [],
+                p1Active: [null, null, null], p2Active: [null, null, null],
+                p1Supports: [], p2Supports: [],
+                turn: 'p1', attacksRemaining: 2, frozenTurns: 0, stats: { damageDealt: 0, turns: 0 }
+            },
+            myRole: 'p1',
+            selectedFighterIndex: null, pendingAttackSlot: null, activePiFighter: null,
+            peer: null, conn: null, isHost: false, isOnline: false,
+
+            openModal(id) { document.getElementById(id).classList.remove('hidden'); },
+            closeModal(id) { document.getElementById(id).classList.add('hidden'); },
+
+            /* Visual Cutscenes & FX */
+            playCutscene(icon, title, sub, duration = 1500) {
+                SoundFX.play('cutscene');
+                const overlay = document.getElementById('cutsceneOverlay');
+                document.getElementById('cutsceneIcon').innerText = icon;
+                document.getElementById('cutsceneTitle').innerText = title;
+                document.getElementById('cutsceneSub').innerText = sub;
+                overlay.classList.add('active');
+                setTimeout(() => {
+                    overlay.classList.remove('active');
+                }, duration);
+            },
+
+            triggerScreenShake() {
+                const container = document.getElementById('mainAppContainer');
+                container.classList.add('shake-impact');
+                setTimeout(() => container.classList.remove('shake-impact'), 350);
+            },
+
+            spawnFloatingText(elementId, text, color = '#ef4444') {
+                const targetEl = document.getElementById(elementId);
+                if (!targetEl) return;
+                const rect = targetEl.getBoundingClientRect();
+                const floatEl = document.createElement('div');
+                floatEl.className = 'floating-text';
+                floatEl.innerText = text;
+                floatEl.style.color = color;
+                floatEl.style.left = (rect.left + rect.width / 2 - 20) + 'px';
+                floatEl.style.top = (rect.top + rect.height / 2) + 'px';
+                document.body.appendChild(floatEl);
+                setTimeout(() => floatEl.remove(), 1000);
+            },
+
+            spawnSlashEffect(cardElement) {
+                if (!cardElement) return;
+                const slash = document.createElement('div');
+                slash.className = 'slash-effect';
+                cardElement.appendChild(slash);
+                setTimeout(() => slash.remove(), 300);
+            },
+
+            startVsAI() {
+                this.isOnline = false;
+                this.myRole = 'p1';
+                document.getElementById('lobbyScreen').classList.add('hidden');
+                document.getElementById('gameScreen').classList.remove('hidden');
+                document.getElementById('statusBadge').innerText = "Vs AI Bot Match";
+                document.getElementById('p2NameLabel').innerText = "Opponent (Bot)";
+                this.initMatch();
+            },
+
+            getPeerConfig() {
+                return {
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            { urls: 'stun:stun3.l.google.com:19302' },
+                            { urls: 'stun:stun4.l.google.com:19302' }
+                        ]
+                    },
+                    debug: 1
+                };
+            },
+
+            hostOnlineRoom() {
+                try {
+                    const fourDigitCode = Math.floor(1000 + Math.random() * 9000).toString();
+                    const fullPeerId = 'amal-room-' + fourDigitCode;
+
+                    if (this.peer) this.peer.destroy();
+                    this.peer = new Peer(fullPeerId, this.getPeerConfig());
+
+                    this.peer.on('open', () => {
+                        const codeInput = document.getElementById('peerCodeInput');
+                        if (codeInput) codeInput.value = fourDigitCode;
+                        alert("Room Created!\n\nYour 4-Digit Room Code: " + fourDigitCode);
+                        document.getElementById('roomModal').classList.add('hidden');
+                        document.getElementById('lobbyScreen').classList.add('hidden');
+                        document.getElementById('gameScreen').classList.remove('hidden');
+                        document.getElementById('statusBadge').innerText = "Host Code: " + fourDigitCode;
+                        document.getElementById('p2NameLabel').innerText = "Waiting for Player 2...";
+                        this.isHost = true;
+                        this.isOnline = true;
+                        this.myRole = 'p1';
+                        this.initMatch();
+                    });
+
+                    this.peer.on('connection', (connection) => {
+                        this.conn = connection;
+                        document.getElementById('statusBadge').innerText = "Online Connected!";
+                        document.getElementById('p2NameLabel').innerText = "Player 2 (Online)";
+                        this.setupPeerListeners();
+                        setTimeout(() => this.syncState(), 500);
+                        this.log("Player 2 joined room!");
+                    });
+
+                    this.peer.on('error', (err) => {
+                        if (err.type === 'unavailable-id') {
+                            alert("Code collision, retrying with new code...");
+                            this.hostOnlineRoom();
+                        } else {
+                            alert("Room Creation Error: " + err.type);
+                        }
+                    });
+                } catch(e) {
+                    alert("Failed to create room: " + e.message);
+                }
+            },
+
+            joinOnlineRoom() {
+                const code = document.getElementById('peerCodeInput').value.trim();
+                if (!code || code.length !== 4) { alert("Please enter a valid 4-digit room code."); return; }
+                const targetPeerId = 'amal-room-' + code;
+
+                try {
+                    if (this.peer) this.peer.destroy();
+                    this.peer = new Peer(this.getPeerConfig());
+
+                    this.peer.on('open', () => {
+                        this.conn = this.peer.connect(targetPeerId, { reliable: true });
+                        this.isHost = false;
+                        this.isOnline = true;
+                        this.myRole = 'p2';
+
+                        this.conn.on('open', () => {
+                            alert("Successfully joined room " + code + "!");
+                            document.getElementById('roomModal').classList.add('hidden');
+                            document.getElementById('lobbyScreen').classList.add('hidden');
+                            document.getElementById('gameScreen').classList.remove('hidden');
+                            document.getElementById('statusBadge').innerText = "Online Connected!";
+                            document.getElementById('p2NameLabel').innerText = "Host (Player 1)";
+                            this.setupPeerListeners();
+                        });
+
+                        this.conn.on('error', (err) => {
+                            alert("Connection Error: " + err);
+                        });
+                    });
+
+                    this.peer.on('error', (err) => {
+                        alert("Peer Error: " + err.type);
+                    });
+                } catch(e) {
+                    alert("Failed to join room: " + e.message);
+                }
+            },
+
+            setupPeerListeners() {
+                if (!this.conn) return;
+                this.conn.on('data', (data) => {
+                    if (data.type === 'SYNC_STATE') {
+                        this.state = data.state;
+                        this.updateUI();
+                    } else if (data.type === 'ACTION') {
+                        this.handleRemoteAction(data.action);
+                    }
+                });
+                this.conn.on('close', () => {
+                    alert("Opponent disconnected!");
+                    this.resetToMenu();
+                });
+            },
+
+            syncState() {
+                if (this.conn && this.conn.open) {
+                    this.conn.send({ type: 'SYNC_STATE', state: this.state });
+                }
+            },
+
+            sendAction(action) {
+                if (this.isOnline && this.conn && this.conn.open) {
+                    this.conn.send({ type: 'ACTION', action: action });
+                }
+            },
+
+            handleRemoteAction(action) {
+                if (action.type === 'DEPLOY') {
+                    this.executeDeploy(action.player, action.index);
+                } else if (action.type === 'ATTACK') {
+                    this.executeAttackLogic(action.attackerIdx, action.targetType, action.targetIdx, action.player);
+                } else if (action.type === 'END_TURN') {
+                    this.executeEndTurn(action.player);
+                } else if (action.type === 'FUSION') {
+                    this.executeNightmareFusion(action.player);
+                } else if (action.type === 'ABILITY') {
+                    this.executeAbility(action.player, action.index, action.piBonus);
+                } else if (action.type === 'SUPPORT') {
+                    this.executeSupport(action.player, action.index, action.targetType, action.targetIdx);
+                }
+            },
+
+            draftCards() {
+                const pool = [...FIGHTER_ROSTER];
+                const drafted = [];
+                for (let i = 0; i < 5; i++) {
+                    const rand = Math.random();
+                    let available = pool;
+                    if (rand < 0.12) {
+                        const sTier = pool.filter(f => f.tier === 'S');
+                        if (sTier.length > 0) available = sTier;
+                    }
+                    const idx = Math.floor(Math.random() * available.length);
+                    drafted.push({ ...available[idx], uniqueId: Math.random().toString(36).substr(2, 9) });
+                }
+                return drafted;
+            },
+
+            draftSupports() {
+                const shuffled = [...SUPPORT_TYPES].sort(() => 0.5 - Math.random());
+                return shuffled.slice(0, 3).map(s => ({ ...s, used: false, uniqueId: Math.random().toString(36).substr(2, 9) }));
+            },
+
+            initMatch() {
+                this.state = {
+                    p1Hp: 3000, p2Hp: 3000,
+                    p1Hand: this.draftCards(), p2Hand: this.draftCards(),
+                    p1Active: [null, null, null], p2Active: [null, null, null],
+                    p1Supports: this.draftSupports(), p2Supports: this.draftSupports(),
+                    turn: 'p1', attacksRemaining: 2, frozenTurns: 0, stats: { damageDealt: 0, turns: 1 }
+                };
+                this.log("Match started! 12% S-Tier drop rate active.");
+                this.syncState();
+                this.updateUI();
+            },
+
+            log(msg) {
+                const box = document.getElementById('logBox');
+                if (!box) return;
+                const div = document.createElement('div');
+                div.innerText = `> ${msg}`;
+                box.appendChild(div);
+                box.scrollTop = box.scrollHeight;
+            },
+
+            showBanner(txt) {
+                const b = document.getElementById('abilityBanner');
+                if (!b) return;
+                b.innerText = txt;
+                b.classList.remove('hidden');
+                setTimeout(() => { b.classList.add('hidden'); }, 3000);
+            },
+
+            deployFighter(index) {
+                if (this.state.turn !== this.myRole) { alert("Not your turn!"); return; }
+                const player = this.myRole;
+                if (this.executeDeploy(player, index)) {
+                    this.sendAction({ type: 'DEPLOY', player, index });
+                }
+            },
+
+            executeDeploy(player, index) {
+                const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const handBoard = player === 'p1' ? this.state.p1Hand : this.state.p2Hand;
+                const emptySlot = activeBoard.indexOf(null);
+                
+                if (emptySlot === -1) { 
+                    if (player === this.myRole) alert("All 3 active slots are full!"); 
+                    return false; 
+                }
+                const fighter = handBoard.splice(index, 1)[0];
+                if (!fighter) return false;
+                
+                fighter.hasAttacked = false;
+                fighter.timer = fighter.cooldown;
+                activeBoard[emptySlot] = fighter;
+
+                this.log(`${player === 'p1' ? 'P1' : 'P2'} deployed ${fighter.name}!`);
+                this.syncState();
+                this.updateUI();
+                return true;
+            },
+
+            triggerNightmareFusion() {
+                if (this.state.turn !== this.myRole) return;
+                const player = this.myRole;
+                if (this.executeNightmareFusion(player)) {
+                    this.sendAction({ type: 'FUSION', player });
+                }
+            },
+
+            executeNightmareFusion(player) {
+                const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const ritaIdx = activeBoard.findIndex(f => f && f.id === 'rita');
+                const joumanaIdx = activeBoard.findIndex(f => f && f.id === 'joumana');
+                
+                if (ritaIdx === -1 || joumanaIdx === -1) {
+                    if (player === this.myRole) alert("You need both Miss Rita and Miss Joumana active on your board!");
+                    return false;
+                }
+
+                this.playCutscene('🔮', 'NIGHTMARE DUO FUSION', 'Miss Rita & Miss Joumana merged into ultimate entity!');
+
+                const fusionFighter = {
+                    id: 'nightmare_duo',
+                    name: 'Nightmare Duo',
+                    tier: 'FUSION',
+                    hp: 2000,
+                    maxHp: 2000,
+                    atk: 900,
+                    cooldown: 1,
+                    timer: 0,
+                    icon: '🔮',
+                    hasAttacked: false,
+                    desc: 'Merged Fusion entity.'
+                };
+
+                activeBoard[ritaIdx] = fusionFighter;
+                activeBoard[joumanaIdx] = null;
+                this.showBanner(`🔥 FUSION ACTIVATED: Nightmare Duo unleashed!`);
+                this.syncState();
+                this.updateUI();
+                return true;
+            },
+
+            triggerAbility(index) {
+                if (this.state.turn !== this.myRole) return;
+                const player = this.myRole;
+                const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const f = activeBoard[index];
+                if (!f || f.timer > 0) return;
+
+                if (f.id === 'brahim') {
+                    this.activePiFighter = f;
+                    this.openModal('piModal');
+                    return;
+                }
+
+                if (this.executeAbility(player, index)) {
+                    this.sendAction({ type: 'ABILITY', player, index });
+                }
+            },
+
+            executeAbility(player, index, piBonus = null) {
+                const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const enemyBoard = player === 'p1' ? this.state.p2Active : this.state.p1Active;
+                const f = activeBoard[index];
+                if (!f) return false;
+
+                f.timer = f.cooldown;
+
+                if (f.id === 'nightmare_duo') {
+                    f.hp = Math.min(f.maxHp, f.hp + 500);
+                    f.atk += 300;
+                    this.playCutscene('🔮', 'NIGHTMARE FURY', '+300 ATK & +500 HP Restored!');
+                } else if (f.id === 'ghizel') {
+                    f.hp = Math.min(f.maxHp, f.hp + Math.round(f.maxHp * 0.25));
+                    f.atk *= 3;
+                    this.playCutscene('👑', 'PRINCIPAL DECREE', 'Miss Ghizel heals 25% HP & 3x DMG!');
+                } else if (f.id === 'brahim') {
+                    if (piBonus) {
+                        f.atk = Math.round(f.atk * piBonus);
+                        this.playCutscene('📐', 'PI RECITATION', `Accuracy Bonus Applied! ${Math.round((piBonus - 1) * 100)}% ATK Boost!`);
+                    }
+                } else if (f.id === 'rawa') {
+                    this.state.frozenTurns = 2;
+                    this.playCutscene('🛑', 'SHUT UP!', 'Enemies frozen for 2 turns!');
+                } else if (f.id === 'lila') {
+                    const enemyFighters = enemyBoard.filter(x => x !== null);
+                    if (enemyFighters.length > 0) {
+                        const target = enemyFighters[0];
+                        const stolen = Math.round(target.hp * 0.5);
+                        target.hp -= stolen;
+                        f.hp = Math.min(f.maxHp, f.hp + stolen);
+                        this.playCutscene('📝', 'WRITTEN QUIZ', `Stole ${stolen} HP from enemy!`);
+                    }
+                } else if (f.id === 'joumana') {
+                    const sacrifice = Math.round(f.hp * 0.3);
+                    f.hp -= sacrifice;
+                    f.atk = Math.round(f.atk * 1.7);
+                    this.showBanner(`⚠️ WARNING: Sacrificed ${sacrifice} HP for +70% ATK!`);
+                } else if (f.id === 'lilan') {
+                    f.atk += 400;
+                    this.showBanner(`🌿 CLOUD PLANTS: +400 extra ATK!`);
+                } else if (f.id === 'kameel') {
+                    this.state.frozenTurns = 1;
+                    f.atk *= 2;
+                    this.showBanner(`🐸 FROG EYES: Double ATK & skip enemy turn!`);
+                } else if (f.id === 'maher') {
+                    this.state.frozenTurns = 1;
+                    this.showBanner(`🗣️ TALKS TOO MUCH: Enemy turn skipped!`);
+                } else if (f.id === 'nada') {
+                    f.atk *= 2;
+                    this.showBanner(`⚡ DOUBLE ATTACK: Double strike!`);
+                } else {
+                    SoundFX.play('ability');
+                }
+
+                this.syncState();
+                this.updateUI();
+                return true;
+            },
+
+            clickActiveFighter(index) {
+                if (this.state.turn !== this.myRole) { alert("Not your turn!"); return; }
+                const activeBoard = this.myRole === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const enemyBoard = this.myRole === 'p1' ? this.state.p2Active : this.state.p1Active;
+                const f = activeBoard[index];
+                if (!f) return;
+                
+                if (f.timer === 0) {
+                    this.triggerAbility(index);
+                    return;
+                }
+
+                if (f.hasAttacked) { alert("Already attacked this turn!"); return; }
+                if (this.state.attacksRemaining <= 0) { alert("No attacks remaining!"); return; }
+
+                const activeEnemyCount = enemyBoard.filter(x => x !== null).length;
+                this.pendingAttackSlot = index;
+
+                if (activeEnemyCount > 0) {
+                    let html = '';
+                    enemyBoard.forEach((ef, ei) => {
+                        if (ef) {
+                            html += `<button class="btn" style="background:#1e293b; justify-content:space-between;" onclick="GameEngine.executeAttack(${index}, 'enemy_fighter', ${ei})"><span>⚔️ ${ef.name}</span> <span>HP: ${ef.hp}/${ef.maxHp}</span></button>`;
+                        }
+                    });
+                    document.getElementById('targetList').innerHTML = html;
+                    this.openModal('targetModal');
+                } else {
+                    this.executeAttack(index, 'enemy_player', 0);
+                }
+            },
+
+            executeAttack(attackerIdx, targetType, targetIdx) {
+                this.closeModal('targetModal');
+                const player = this.myRole;
+                this.executeAttackLogic(attackerIdx, targetType, targetIdx, player);
+                this.sendAction({ type: 'ATTACK', attackerIdx, targetType, targetIdx, player });
+            },
+
+            executeAttackLogic(attackerIdx, targetType, targetIdx, player) {
+                const attackerBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const defenderBoard = player === 'p1' ? this.state.p2Active : this.state.p1Active;
+                const attacker = attackerBoard[attackerIdx];
+                if (!attacker) return;
+
+                SoundFX.play('attack');
+                this.triggerScreenShake();
+                let dmg = attacker.atk;
+                this.state.stats.damageDealt += dmg;
+
+                if (targetType === 'enemy_fighter') {
+                    const defender = defenderBoard[targetIdx];
+                    if (defender) {
+                        defender.hp -= dmg;
+                        const boardId = player === 'p1' ? 'p2ActiveBoard' : 'p1ActiveBoard';
+                        const cardEl = document.getElementById(boardId)?.children[targetIdx];
+                        this.spawnSlashEffect(cardEl);
+                        this.spawnFloatingText(boardId, `-${dmg}`, '#ef4444');
+
+                        this.log(`${player === 'p1' ? 'P1' : 'P2'} ${attacker.name} hit ${defender.name} for ${dmg} DMG!`);
+                        if (defender.hp <= 0) {
+                            this.log(`Fighter ${defender.name} defeated!`);
+                            defenderBoard[targetIdx] = null;
+                        }
+                    }
+                } else {
+                    if (player === 'p1') {
+                        this.state.p2Hp = Math.max(0, this.state.p2Hp - dmg);
+                        this.spawnFloatingText('opponentPanel', `-${dmg}`, '#ef4444');
+                    } else {
+                        this.state.p1Hp = Math.max(0, this.state.p1Hp - dmg);
+                        this.spawnFloatingText('playerPanel', `-${dmg}`, '#ef4444');
+                    }
+                    this.log(`${player === 'p1' ? 'P1' : 'P2'} ${attacker.name} attacked opponent directly for ${dmg} DMG!`);
+                    
+                    if (this.state.p1Hp <= 0 || this.state.p2Hp <= 0) {
+                        const isWin = (this.myRole === 'p1' && this.state.p2Hp <= 0) || (this.myRole === 'p2' && this.state.p1Hp <= 0);
+                        this.triggerGameOver(isWin);
+                        return;
+                    }
+                }
+
+                attacker.hasAttacked = true;
+                this.state.attacksRemaining--;
+                this.syncState();
+                this.updateUI();
+
+                if (this.state.attacksRemaining <= 0 && this.state.turn === this.myRole) {
+                    setTimeout(() => this.endTurn(), 800);
+                }
+            },
+
+            useSupport(player, index) {
+                if (player !== this.myRole) return;
+                const supports = player === 'p1' ? this.state.p1Supports : this.state.p2Supports;
+                const supp = supports[index];
+                if (supp.used) return;
+
+                supp.used = true;
+                SoundFX.play('ability');
+                this.log(`Support Trap Flipped: ${supp.symbol} ${supp.name}!`);
+
+                if (supp.id === 'heal') {
+                    let html = `<button class="btn" onclick="GameEngine.resolveHeal('player', 0)">💖 Restore 600 Player HP</button>`;
+                    const myActive = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    myActive.forEach((f, fi) => {
+                        if (f) html += `<button class="btn" style="background:#1e293b;" onclick="GameEngine.resolveHeal('fighter', ${fi})">💖 Heal ${f.name} (+600 HP)</button>`;
+                    });
+                    document.getElementById('healList').innerHTML = html;
+                    this.openModal('healModal');
+                } else {
+                    this.executeSupport(player, index, 'none', 0);
+                    this.sendAction({ type: 'SUPPORT', player, index, targetType: 'none', targetIdx: 0 });
+                }
+            },
+
+            resolveHeal(targetType, idx) {
+                this.closeModal('healModal');
+                const player = this.myRole;
+                this.executeSupport(player, 0, targetType, idx);
+                this.sendAction({ type: 'SUPPORT', player, index: 0, targetType, targetIdx: idx });
+            },
+
+            executeSupport(player, index, targetType, targetIdx) {
+                const supports = player === 'p1' ? this.state.p1Supports : this.state.p2Supports;
+                const supp = supports[index];
+                if (supp) supp.used = true;
+
+                if (targetType === 'player') {
+                    if (player === 'p1') {
+                        this.state.p1Hp = Math.min(3000, this.state.p1Hp + 600);
+                        this.spawnFloatingText('playerPanel', `+600`, '#10b981');
+                    } else {
+                        this.state.p2Hp = Math.min(3000, this.state.p2Hp + 600);
+                        this.spawnFloatingText('opponentPanel', `+600`, '#10b981');
+                    }
+                } else if (targetType === 'fighter') {
+                    const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    const f = activeBoard[targetIdx];
+                    if (f) {
+                        f.hp = Math.min(f.maxHp, f.hp + 600);
+                        const boardId = player === 'p1' ? 'p1ActiveBoard' : 'p2ActiveBoard';
+                        this.spawnFloatingText(boardId, `+600`, '#10b981');
+                    }
+                } else if (supp && supp.id === 'bell') {
+                    const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    activeBoard.forEach(f => { if (f) f.timer = 0; });
+                    this.showBanner(`🔔 SCHOOL BELL: Cooldowns reset!`);
+                } else if (supp && supp.id === 'extra') {
+                    const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    activeBoard.forEach(f => { if (f) f.atk += 200; });
+                    this.showBanner(`⚡ EXTRA CREDIT: Active fighters gain +200 ATK!`);
+                } else if (supp && supp.id === 'detention') {
+                    this.state.frozenTurns = 1;
+                    this.showBanner(`🛑 DETENTION SLIP: Opponent turn skipped!`);
+                }
+                this.syncState();
+                this.updateUI();
+            },
+
+            endTurn() {
+                if (this.state.turn !== this.myRole) return;
+                const player = this.myRole;
+                this.executeEndTurn(player);
+                this.sendAction({ type: 'END_TURN', player });
+            },
+
+            executeEndTurn(player) {
+                this.log(`Ending ${player === 'p1' ? 'P1' : 'P2'} turn...`);
+                
+                const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                activeBoard.forEach(f => { if (f && f.timer > 0) f.timer--; });
+
+                if (this.state.frozenTurns > 0) {
+                    this.state.frozenTurns--;
+                    this.log(`Next turn is frozen! Turn skipped.`);
+                    this.state.attacksRemaining = 2;
+                    activeBoard.forEach(f => { if (f) f.hasAttacked = false; });
+                } else {
+                    this.state.turn = player === 'p1' ? 'p2' : 'p1';
+                    this.state.attacksRemaining = 2;
+                    const newBoard = this.state.turn === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    newBoard.forEach(f => { if (f) f.hasAttacked = false; });
+                }
+
+                this.syncState();
+                this.updateUI();
+
+                if (!this.isOnline && this.state.turn === 'p2') {
+                    setTimeout(() => this.runBotTurn(), 1200);
+                }
+            },
+
+            runBotTurn() {
+                this.state.stats.turns++;
+
+                if (this.state.frozenTurns > 0) {
+                    this.log(`Opponent is frozen (${this.state.frozenTurns} turns left)! Turn skipped.`);
+                    this.state.frozenTurns--;
+                    this.state.turn = 'p1';
+                    this.state.attacksRemaining = 2;
+                    this.state.p1Active.forEach(f => { if (f) f.hasAttacked = false; });
+                    this.updateUI();
+                    return;
+                }
+
+                while (this.state.p2Active.includes(null) && this.state.p2Hand.length > 0) {
+                    const emptyIdx = this.state.p2Active.indexOf(null);
+                    const f = this.state.p2Hand.pop();
+                    this.state.p2Active[emptyIdx] = { ...f, hasAttacked: false, timer: f.cooldown };
+                }
+
+                this.state.p2Active.forEach((botFighter) => {
+                    if (!botFighter) return;
+                    const activePlayerFighters = this.state.p1Active.filter(x => x !== null);
+                    if (activePlayerFighters.length > 0) {
+                        const targetIdx = this.state.p1Active.findIndex(x => x !== null);
+                        if (targetIdx !== -1) {
+                            const target = this.state.p1Active[targetIdx];
+                            target.hp -= botFighter.atk;
+                            this.triggerScreenShake();
+                            this.spawnFloatingText('p1ActiveBoard', `-${botFighter.atk}`, '#ef4444');
+                            this.log(`Bot hit your ${target.name} for ${botFighter.atk} DMG!`);
+                            if (target.hp <= 0) this.state.p1Active[targetIdx] = null;
+                        }
+                    } else {
+                        this.state.p1Hp = Math.max(0, this.state.p1Hp - botFighter.atk);
+                        this.triggerScreenShake();
+                        this.spawnFloatingText('playerPanel', `-${botFighter.atk}`, '#ef4444');
+                        if (this.state.p1Hp <= 0) {
+                            this.triggerGameOver(false);
+                            return;
+                        }
+                    }
+                });
+
+                if (this.state.p1Hp > 0) {
+                    this.state.turn = 'p1';
+                    this.state.attacksRemaining = 2;
+                    this.state.p1Active.forEach(f => { if (f) f.hasAttacked = false; });
+                    this.log("Your turn started!");
+                }
+                this.updateUI();
+            },
+
+            submitPi() {
+                const val = document.getElementById('piInput').value.trim();
+                const correctPi = "1415926535";
+                let correctCount = 0;
+                for (let i = 0; i < val.length; i++) {
+                    if (val[i] === correctPi[i]) correctCount++;
+                    else break;
+                }
+                const bonus = 1 + (correctCount * 0.2);
+                if (this.activePiFighter) {
+                    const player = this.myRole;
+                    const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    const idx = activeBoard.indexOf(this.activePiFighter);
+                    this.executeAbility(player, idx, bonus);
+                    this.sendAction({ type: 'ABILITY', player, index: idx, piBonus: bonus });
+                }
+                this.closeModal('piModal');
+            },
+
+            triggerGameOver(isWin) {
+                const title = document.getElementById('winTitle');
+                const sub = document.getElementById('winSub');
+                const stats = document.getElementById('gameStats');
+                if (isWin) {
+                    title.innerText = "VICTORY!";
+                    title.style.color = "var(--accent-green)";
+                    sub.innerText = "You reduced opponent HP to zero!";
+                } else {
+                    title.innerText = "DEFEAT";
+                    title.style.color = "var(--accent-red)";
+                    sub.innerText = "Your HP reached zero!";
+                }
+                stats.innerText = `Total Turns: ${this.state.stats.turns} | Total DMG: ${this.state.stats.damageDealt}`;
+                this.openModal('gameOverModal');
+            },
+
+            resetToMenu() {
+                if (this.conn) this.conn.close();
+                if (this.peer) this.peer.destroy();
+                this.closeModal('gameOverModal');
+                document.getElementById('gameScreen').classList.add('hidden');
+                document.getElementById('lobbyScreen').classList.remove('hidden');
+                document.getElementById('statusBadge').innerText = "Main Menu";
+            },
+
+            updateUI() {
+                const isMyTurn = this.state.turn === this.myRole;
+                const myActive = this.myRole === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const opponentActive = this.myRole === 'p1' ? this.state.p2Active : this.state.p1Active;
+                const myHand = this.myRole === 'p1' ? this.state.p1Hand : this.state.p2Hand;
+                const myHp = this.myRole === 'p1' ? this.state.p1Hp : this.state.p2Hp;
+                const opponentHp = this.myRole === 'p1' ? this.state.p2Hp : this.state.p1Hp;
+
+                const myPct = (myHp / 3000) * 100;
+                const oppPct = (opponentHp / 3000) * 100;
+                document.getElementById('p1HpBar').style.width = myPct + '%';
+                document.getElementById('p1HpText').innerText = myHp;
+                document.getElementById('p2HpBar').style.width = oppPct + '%';
+                document.getElementById('p2HpText').innerText = opponentHp;
+                
+                const roleLabel = document.getElementById('myRoleLabel');
+                if (roleLabel) roleLabel.innerText = this.myRole === 'p1' ? 'Player 1' : 'Player 2';
+
+                const turnBanner = document.getElementById('turnBannerText');
+                const endBtn = document.getElementById('endTurnBtn');
+                if (isMyTurn) {
+                    turnBanner.innerText = `YOUR TURN (${this.state.attacksRemaining} ATTACKS REMAINING)`;
+                    turnBanner.style.color = '#f59e0b';
+                    endBtn.disabled = false;
+                } else {
+                    turnBanner.innerText = "OPPONENT TURN...";
+                    turnBanner.style.color = '#ef4444';
+                    endBtn.disabled = true;
+                }
+
+                const mySupports = this.myRole === 'p1' ? this.state.p1Supports : this.state.p2Supports;
+                let p1SupHtml = '';
+                mySupports.forEach((s, i) => {
+                    p1SupHtml += `<div class="support-card ${s.used ? 'used' : ''}" onclick="GameEngine.useSupport('${this.myRole}', ${i})">${s.symbol}</div>`;
+                });
+                document.getElementById('p1Supports').innerHTML = p1SupHtml;
+
+                const fusionBtn = document.getElementById('fusionBtn');
+                if (fusionBtn) {
+                    const hasRita = myActive.some(f => f && f.id === 'rita');
+                    const hasJoumana = myActive.some(f => f && f.id === 'joumana');
+                    fusionBtn.style.display = (hasRita && hasJoumana) ? 'inline-flex' : 'none';
+                }
+
+                let p1BoardHtml = '';
+                myActive.forEach((f, i) => {
+                    if (f) {
+                        const isReady = f.timer === 0;
+                        p1BoardHtml += `
+                            <div class="vertical-card tier-border-${f.tier} ${isReady ? 'ability-ready-pulse' : ''}" onclick="GameEngine.clickActiveFighter(${i})">
+                                <div class="card-top-row">
+                                    <span class="card-tier-tag ${f.tier}">${f.tier}-TIER</span>
+                                    <span class="card-atk-tag">ATK: ${f.atk}</span>
+                                </div>
+                                <div style="font-size: 22px; margin-top:2px;">${f.icon || '⚔️'}</div>
+                                <div class="card-title-main">${f.name}</div>
+                                <div class="card-hp-footer">HP: ${f.hp}/${f.maxHp}</div>
+                            </div>`;
+                    } else {
+                        p1BoardHtml += `<div class="empty-slot">Slot ${i + 1}</div>`;
+                    }
+                });
+                document.getElementById('p1ActiveBoard').innerHTML = p1BoardHtml;
+
+                let p2BoardHtml = '';
+                opponentActive.forEach((f, i) => {
+                    if (f) {
+                        p2BoardHtml += `
+                            <div class="vertical-card tier-border-${f.tier}">
+                                <div class="card-top-row">
+                                    <span class="card-tier-tag ${f.tier}">${f.tier}-TIER</span>
+                                    <span class="card-atk-tag">ATK: ${f.atk}</span>
+                                </div>
+                                <div style="font-size: 22px; margin-top:2px;">${f.icon || '⚔️'}</div>
+                                <div class="card-title-main">${f.name}</div>
+                                <div class="card-hp-footer">HP: ${f.hp}/${f.maxHp}</div>
+                            </div>`;
+                    } else {
+                        p2BoardHtml += `<div class="empty-slot">Slot ${i + 1}</div>`;
+                    }
+                });
+                document.getElementById('p2ActiveBoard').innerHTML = p2BoardHtml;
+
+                let handHtml = '';
+                myHand.forEach((f, i) => {
+                    handHtml += `
+                        <div class="vertical-card tier-border-${f.tier}" style="min-width: 105px; max-width: 105px;" onclick="GameEngine.deployFighter(${i})">
+                            <div class="card-top-row">
+                                <span class="card-tier-tag ${f.tier}">${f.tier}-TIER</span>
+                                <span class="card-atk-tag">ATK: ${f.atk}</span>
+                            </div>
+                            <div style="font-size: 20px; margin-top:2px;">${f.icon || '⚔️'}</div>
+                            <div class="card-title-main">${f.name}</div>
+                            <div class="card-hp-footer">HP: ${f.hp}/${f.maxHp}</div>
+                        </div>`;
+                });
+                document.getElementById('p1HandBoard').innerHTML = handHtml || '<div style="color: #6b7280; font-size: 11px; padding: 10px;">No reserve cards left.</div>';
+            }
+        };
+    </script>
+</body>
+</html>
