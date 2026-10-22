@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Amal Shenanigans</title>
+    <style>
+        :root {
+            --bg-dark: #090c15;
+            --panel-bg: #121826;
+            --panel-border: #232d42;
+            --card-bg: #1a2336;
+            --primary: #ec4899;
+            --primary-hover: #db2777;
+            --accent-gold: #f59e0b;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            padding: 12px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow-x: hidden;
+        }
+
+        .container { max-width: 960px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 10px; }
+        .panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 12px; padding: 14px; position: relative; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--panel-border); padding-bottom: 10px; }
+
+        .hp-bar-bg { background: #1a202c; border-radius: 8px; height: 22px; overflow: hidden; position: relative; width: 100%; border: 1px solid #374151; margin-top: 4px; }
+        .hp-bar-fill { height: 100%; transition: width 0.4s ease-out; }
+        .p1-hp { background: linear-gradient(90deg, #059669, #10b981); }
+        .p2-hp { background: linear-gradient(90deg, #dc2626, #ef4444); }
+        .hp-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+
+        .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; min-height: 150px; }
+        @media (max-width: 640px) { .card-grid { grid-template-columns: 1fr; } }
+
+        .fighter-card { background: var(--card-bg); border: 2px solid #2e3a54; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; position: relative; transition: transform 0.2s, border-color 0.2s; }
+        .fighter-card.ability-ready { border-color: var(--accent-gold); box-shadow: 0 0 12px rgba(245, 158, 11, 0.5); animation: pulseGlow 1.2s infinite alternate; }
+        .fighter-card.exhausted { opacity: 0.5; border-color: #374151; }
+        @keyframes pulseGlow { from { box-shadow: 0 0 6px rgba(245, 158, 11, 0.4); } to { box-shadow: 0 0 18px rgba(245, 158, 11, 0.8); } }
+
+        .tier-badge { font-size: 9px; font-weight: 900; padding: 2px 6px; border-radius: 4px; color: #000; display: inline-block; letter-spacing: 0.5px; }
+        .tier-S { background: #f59e0b; } .tier-A { background: #ec4899; } .tier-B { background: #8b5cf6; } .tier-C { background: #3b82f6; } .tier-D { background: #9ca3af; }
+
+        .persona-tag { font-size: 10px; font-style: italic; color: #fbbf24; margin-top: 2px; }
+
+        .support-row { display: flex; gap: 8px; }
+        .support-card { width: 44px; height: 58px; border-radius: 8px; background: linear-gradient(135deg, #4c1d95, #831843); border: 2px solid #ec4899; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; cursor: pointer; color: #f472b6; transition: 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .support-card:hover:not(.used) { transform: translateY(-3px) scale(1.05); box-shadow: 0 0 12px #ec4899; }
+        .support-card.used { background: #182030; border-color: #374151; color: #4b5563; cursor: default; transform: none; box-shadow: none; }
+
+        .btn { background: var(--primary); color: #fff; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: background 0.2s, transform 0.1s; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+        .btn:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .btn-green { background: var(--accent-green); } .btn-green:hover:not(:disabled) { background: #059669; }
+        .btn-blue { background: var(--accent-blue); } .btn-blue:hover:not(:disabled) { background: #2563eb; }
+        .btn-gold { background: var(--accent-gold); color: #000; } .btn-gold:hover:not(:disabled) { background: #d97706; }
+
+        .ability-banner { background: linear-gradient(90deg, #7c3aed, #d946ef); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: bold; text-align: center; display: none; box-shadow: 0 4px 14px rgba(217, 70, 239, 0.4); }
+
+        .log-box { background: #080b12; border: 1px solid #1a2336; border-radius: 8px; padding: 8px 12px; height: 95px; overflow-y: auto; font-family: monospace; font-size: 11px; color: #a1a1aa; display: flex; flex-direction: column; gap: 3px; }
+        
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+        .modal-content { background: var(--panel-bg); border: 1px solid #374151; padding: 20px; border-radius: 14px; max-width: 500px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .hidden { display: none !important; }
+
+        .rules-item { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--panel-border); }
+        .rules-item h4 { color: var(--accent-gold); font-size: 13px; margin-bottom: 4px; }
+        .rules-item p, .rules-item li { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+
+        /* CUTSCENE ANIMATION STYLES */
+        .cutscene-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .cutscene-bg-effect {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, rgba(9, 12, 21, 0.95) 75%);
+            animation: pulseBg 0.8s infinite alternate;
+        }
+
+        .cutscene-banner {
+            position: relative;
+            z-index: 201;
+            transform: scale(0.5);
+            animation: zoomIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .cutscene-tier {
+            font-size: 14px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .cutscene-title {
+            font-size: 32px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(255,255,255,0.8), 0 0 40px var(--accent-gold);
+            margin-bottom: 6px;
+            letter-spacing: 1px;
+        }
+
+        .cutscene-ability {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--accent-gold);
+            text-shadow: 0 0 10px var(--accent-gold);
+            margin-bottom: 14px;
+        }
+
+        .cutscene-desc {
+            font-size: 14px;
+            color: #d1d5db;
+            max-width: 320px;
+            margin: 0 auto;
+            line-height: 1.4;
+            background: rgba(18, 24, 38, 0.8);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            padding: 10px 16px;
+            border-radius: 8px;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes zoomIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes pulseBg {
+            from { transform: scale(1); opacity: 0.8; }
+            to { transform: scale(1.1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- CUTSCENE OVERLAY -->
+    <div id="cutsceneOverlay" class="cutscene-overlay hidden">
+        <div id="cutsceneBg" class="cutscene-bg-effect"></div>
+        <div class="cutscene-banner">
+            <div id="cutsceneTier" class="cutscene-tier tier-S">S TIER</div>
+            <div id="cutsceneTitle" class="cutscene-title">MISS GHIZEL</div>
+            <div id="cutsceneAbility" class="cutscene-ability">✨ PRINCIPAL'S DECREE ✨</div>
+            <div id="cutsceneDesc" class="cutscene-desc">Heals 25% max HP & 3x DMG for 1 turn!</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Main Header -->
+        <div class="panel header">
+            <div>
+                <h1 style="font-size: 20px; color: var(--primary); font-weight: 900; letter-spacing: 0.5px;">AMAL SHENANIGANS</h1>
+                <p style="font-size: 11px; color: var(--text-muted);">Tactical School Card Battle Game</p>
+            </div>
+            <div id="statusBadge" style="font-size: 11px; color: var(--accent-gold); font-weight: bold; background: #1c2536; padding: 5px 12px; border-radius: 6px; border: 1px solid #2e3a54;">Main Menu</div>
+        </div>
+
+        <!-- MAIN MENU SCREEN -->
+        <div id="lobbyScreen" class="panel" style="text-align: center; padding: 36px 16px;">
+            <h2 style="font-size: 22px; margin-bottom: 8px; color: var(--text-main);">Enter the Shenanigans Arena</h2>
+            <p style="color: var(--text-muted); font-size: 12px; max-width: 460px; margin: 0 auto 24px; line-height: 1.5;">Draft random fighters, trigger active abilities every few turns, set secret support traps, and win!</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px; max-width: 280px; margin: 0 auto;">
+                <button class="btn btn-green" style="font-size: 14px; padding: 12px;" onclick="GameEngine.startVsAI()">⚔️ Play Vs AI Bot</button>
+                <button class="btn btn-blue" style="font-size: 14px; padding: 12px;" onclick="GameEngine.openModal('roomModal')">🌐 Custom Room Setup</button>
+                <button class="btn" style="font-size: 14px; padding: 12px; background: #4b5563;" onclick="GameEngine.openModal('rulesModal')">📖 Rules & Abilities</button>
+            </div>
+        </div>
+
+        <!-- BATTLE SCREEN -->
+        <div id="gameScreen" class="hidden" style="display: flex; flex-direction: column; gap: 10px;">
+            
+            <!-- Opponent Status -->
+            <div class="panel" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div style="flex-grow: 1; max-width: 280px;">
+                    <div style="font-size: 12px; font-weight: bold; color: var(--accent-red);" id="p2Title">Opponent (Bot)</div>
+                    <div class="hp-bar-bg">
+                        <div id="p2HpBar" class="hp-bar-fill p2-hp" style="width: 100%;"></div>
+                        <div id="p2HpText" class="hp-text">3000 / 3000 HP</div>
+                    </div>
+                </div>
+                <div>
+                    <span style="font-size: 10px; color: var(--text-muted); display: block; text-align: right; margin-bottom: 2px;">Opponent Secret Traps</span>
+                    <div id="p2Supports" class="support-row"></div>
+                </div>
+            </div>
+
+            <!-- Opponent Active Board -->
+            <div class="panel">
+                <div style="font-size: 10px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px; display: flex; justify-content: space-between;">
+                    <span>OPPONENT ACTIVE FIELD (MAX 3)</span>
+                    <span id="p2HandCount" style="color: #6b7280;">Reserve: 2 Cards</span>
+                </div>
+                <div id="p2ActiveBoard" class="card-grid"></div>
+            </div>
+
+            <!-- Ability Banner -->
+            <div id="abilityBanner" class="ability-banner"></div>
+
+            <!-- Combat Engine Logs & Turn Status -->
+            <div class="panel">
+                <div id="logBox" class="log-box"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                    <div id="turnInfo" style="font-size: 12px; font-weight: 800; color: var(--accent-green);">YOUR TURN (2 ATTACKS REMAINING)</div>
+                    <button id="endTurnBtn" class="btn" onclick="GameEngine.endTurn()">End Turn</button>
+                </div>
+            </div>
+
+            <!-- Player Active Board -->
+            <div class="panel">
+                <div style="font-size: 10px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">YOUR ACTIVE FIELD (MAX 3 - Click glowing cards to trigger ready abilities!)</div>
+                <div id="p1ActiveBoard" class="card-grid"></div>
+            </div>
+
+            <!-- Player Status & Supports -->
+            <div class="panel" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div style="flex-grow: 1; max-width: 280px;">
+                    <div style="font-size: 12px; font-weight: bold; color: var(--accent-green);" id="p1Title">You (Player 1)</div>
+                    <div class="hp-bar-bg">
+                        <div id="p1HpBar" class="hp-bar-fill p1-hp" style="width: 100%;"></div>
+                        <div id="p1HpText" class="hp-text">3000 / 3000 HP</div>
+                    </div>
+                </div>
+                <div>
+                    <span style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">Your Secret Supports (1-Time Trigger)</span>
+                    <div id="p1Supports" class="support-row"></div>
+                </div>
+            </div>
+
+            <!-- Reserve Hand -->
+            <div class="panel">
+                <div style="font-size: 10px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">RESERVE FIGHTERS HAND (Click to deploy into empty active slot)</div>
+                <div id="p1HandBoard" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Target Selection Modal -->
+    <div id="targetModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 10px; color: var(--text-main);">Select Attack Target</h3>
+            <div id="targetList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            <button class="btn" style="margin-top: 12px; background: #4b5563; width: 100%;" onclick="GameEngine.closeModal('targetModal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Heal Support Target Modal -->
+    <div id="healModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 6px; color: var(--accent-green);">💖 Heal Support Card</h3>
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">Choose target to restore HP:</p>
+            <div id="healList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            <button class="btn" style="margin-top: 12px; background: #4b5563; width: 100%;" onclick="GameEngine.closeModal('healModal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Pi Recitation Modal (Mr. Brahim) -->
+    <div id="piModal" class="modal hidden">
+        <div class="modal-content" style="text-align: center;">
+            <h3 style="color: var(--accent-gold); margin-bottom: 6px;">📐 Mr. Brahim's Pi Recitation!</h3>
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">Type digits of Pi after "3." (e.g., 14159...). Each correct digit adds +20% ATK damage!</p>
+            <input type="text" id="piInput" placeholder="14159..." style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #374151; background: #080b12; color: #fff; font-size: 14px; font-family: monospace; text-align: center; margin-bottom: 12px;">
+            <button class="btn btn-green" style="width: 100%;" onclick="GameEngine.submitPi()">Declare Pi Digits</button>
+        </div>
+    </div>
+
+    <!-- Custom Room Setup Modal -->
+    <div id="roomModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 10px; color: var(--accent-blue);">Custom Room Setup</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="roomCodeInput" placeholder="Enter Room Code (e.g. AMAL123)" style="padding: 10px; border-radius: 6px; border: 1px solid #374151; background: #080b12; color: #fff; font-size: 12px;">
+                <button class="btn btn-blue" onclick="GameEngine.joinRoom()">Join Room</button>
+                <div style="text-align: center; color: #6b7280; font-size: 11px;">OR</div>
+                <button class="btn btn-green" onclick="GameEngine.createRoom()">Create Random Room</button>
+            </div>
+            <button class="btn" style="margin-top: 12px; background: #4b5563; width: 100%;" onclick="GameEngine.closeModal('roomModal')">Close</button>
+        </div>
+    </div>
+
+    <!-- Rules & Abilities Modal -->
+    <div id="rulesModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 12px; color: var(--primary); text-align: center;">📖 Fighter Abilities & Rules</h3>
+            
+            <div class="rules-item">
+                <h4>1. Drop Rates</h4>
+                <p><b>S-Tier Drop Rate: 10%</b>. S-Tier cards feature powerful abilities that can turn the tide of battle.</p>
+            </div>
+
+            <div class="rules-item">
+                <h4>2. Fighter Abilities</h4>
+                <div id="personaList" style="display:flex; flex-direction:column; gap:6px; margin-top:6px;"></div>
+            </div>
+
+            <button class="btn" style="margin-top: 8px; background: var(--primary); width: 100%;" onclick="GameEngine.closeModal('rulesModal')">Close Manual</button>
+        </div>
+    </div>
+
+    <!-- Victory/Defeat Game Over Modal -->
+    <div id="gameOverModal" class="modal hidden">
+        <div class="modal-content" style="text-align: center;">
+            <h2 id="winTitle" style="font-size: 26px; margin-bottom: 6px;">VICTORY!</h2>
+            <p id="winSub" style="font-size: 12px; color: var(--text-muted); margin-bottom: 18px;"></p>
+            <div id="gameStats" style="font-size: 11px; color: var(--accent-gold); margin-bottom: 16px; font-family: monospace;"></div>
+            <button class="btn btn-green" style="padding: 10px 20px;" onclick="GameEngine.resetToMenu()">Return to Main Menu</button>
+        </div>
+    </div>
+
+    <script>
+        // Audio Synthesizer
+        const SoundFX = {
+            ctx: null,
+            init() { 
+                try {
+                    if (!this.ctx) {
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        if (AudioCtx) this.ctx = new AudioCtx();
+                    }
+                    if (this.ctx && this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+                } catch(e) { console.warn('Audio initialization error', e); }
+            },
+            play(type) {
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    const now = this.ctx.currentTime;
+
+                    if (type === 'attack') {
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(300, now);
+                        osc.frequency.exponentialRampToValueAtTime(80, now + 0.15);
+                        gain.gain.setValueAtTime(0.3, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                        osc.start(now); osc.stop(now + 0.15);
+                    } else if (type === 'ability') {
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(400, now);
+                        osc.frequency.exponentialRampToValueAtTime(800, now + 0.25);
+                        gain.gain.setValueAtTime(0.25, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+                        osc.start(now); osc.stop(now + 0.25);
+                    } else if (type === 'cutscene') {
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(200, now);
+                        osc.frequency.exponentialRampToValueAtTime(900, now + 0.4);
+                        gain.gain.setValueAtTime(0.4, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                        osc.start(now); osc.stop(now + 0.4);
+                    } else if (type === 'deploy') {
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(150, now);
+                        osc.frequency.exponentialRampToValueAtTime(350, now + 0.12);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+                        osc.start(now); osc.stop(now + 0.12);
+                    } else if (type === 'support') {
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(520, now);
+                        osc.frequency.exponentialRampToValueAtTime(260, now + 0.2);
+                        gain.gain.setValueAtTime(0.15, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                        osc.start(now); osc.stop(now + 0.2);
+                    } else if (type === 'heal') {
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(300, now);
+                        osc.frequency.exponentialRampToValueAtTime(600, now + 0.3);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                        osc.start(now); osc.stop(now + 0.3);
+                    } else if (type === 'win') {
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(440, now);
+                        osc.frequency.setValueAtTime(554, now + 0.1);
+                        osc.frequency.setValueAtTime(659, now + 0.2);
+                        gain.gain.setValueAtTime(0.3, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                        osc.start(now); osc.stop(now + 0.4);
+                    } else if (type === 'lose') {
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(300, now);
+                        osc.frequency.exponentialRampToValueAtTime(100, now + 0.4);
+                        gain.gain.setValueAtTime(0.3, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                        osc.start(now); osc.stop(now + 0.4);
+                    }
+                } catch(e) {}
+            }
+        };
+
+        const FIGHTER_ROSTER = [
+            { id: 'ghizel', name: 'Miss Ghizel', persona: 'Strict Principal', tier: 'S', hp: 1000, maxHp: 1000, atk: 1000, cooldown: 3, timer: 3, abilityName: "PRINCIPAL'S DECREE", desc: 'Heals 25% max HP & 3x DMG for 1 turn.' },
+            { id: 'brahim', name: 'Mr. Brahim', persona: 'Math Genius Master', tier: 'S', hp: 1000, maxHp: 1000, atk: 500, cooldown: 2, timer: 2, abilityName: 'PI RECITING BOOST', desc: 'Type Pi digits for +20% DMG per correct digit.' },
+            { id: 'rawa', name: 'Miss Rawa', persona: 'Silence Overseer', tier: 'A', hp: 2000, maxHp: 2000, atk: 400, cooldown: 2, timer: 2, abilityName: 'SHUT UP!', desc: 'Shut Up: Skips opponent turn for 2 full turns.' },
+            { id: 'lila', name: 'Miss Lila', persona: 'Pop Quiz Master', tier: 'A', hp: 800, maxHp: 800, atk: 500, cooldown: 2, timer: 2, abilityName: 'SURPRISE POP QUIZ', desc: 'Pop Quiz: Steals 50% current HP from enemy fighter.' },
+            { id: 'joumana', name: 'Miss Joumana', persona: 'Strict Monitor', tier: 'B', hp: 800, maxHp: 800, atk: 400, cooldown: 3, timer: 3, abilityName: 'MONITOR RAGE', desc: 'Sacrifices 30% HP to gain +70% ATK boost.' },
+            { id: 'lilan', name: 'Miss Lilan', persona: 'Nature Enthusiast', tier: 'B', hp: 700, maxHp: 700, atk: 300, cooldown: 2, timer: 2, abilityName: 'CLOUD PLANTS BIND', desc: 'Cloud Plants: Deals +400 bonus strike damage.' },
+            { id: 'kameel', name: 'Mr. Kameel', persona: 'Eagle Eye Inspector', tier: 'C', hp: 650, maxHp: 650, atk: 200, cooldown: 2, timer: 2, abilityName: 'FROG EYES GLARE', desc: 'Frog Eyes: Skips enemy turn & doubles ATK.' },
+            { id: 'rita', name: 'Miss Rita', persona: 'Duo Tactician', tier: 'C', hp: 600, maxHp: 600, atk: 200, cooldown: 3, timer: 3, abilityName: 'DUO COORDINATION', desc: 'Component required for Nightmare Duo Fusion.' },
+            { id: 'maher', name: 'Mr. Maher', persona: 'Endless Storyteller', tier: 'D', hp: 500, maxHp: 500, atk: 50, cooldown: 2, timer: 2, abilityName: 'TALKS TOO MUCH', desc: 'Talks Too Much: Forces enemy to skip their next turn.' },
+            { id: 'nada', name: 'Miss Nada', persona: 'Swift Drillmaster', tier: 'D', hp: 200, maxHp: 200, atk: 200, cooldown: 4, timer: 4, abilityName: 'DOUBLE DRILL STRIKE', desc: 'Double Attack: Instantly unleashes double damage.' }
+        ];
+
+        const SUPPORT_TYPES = [
+            { id: 'heal', symbol: '💖', name: 'Heal Support' },
+            { id: 'evade', symbol: '💨', name: 'Evade Support' },
+            { id: 'merge', symbol: '🌀', name: 'Merge Support' },
+            { id: 'extra', symbol: '⚡', name: 'Extra Credit' },
+            { id: 'detention', symbol: '🛑', name: 'Detention Slip' },
+            { id: 'bell', symbol: '🔔', name: 'School Bell' }
+        ];
+
+        const GameEngine = {
+            state: {
+                p1Hp: 3000, p2Hp: 3000,
+                p1Hand: [], p2Hand: [],
+                p1Active: [null, null, null], p2Active: [null, null, null],
+                p1Supports: [], p2Supports: [],
+                p1FrozenTurns: 0, p2FrozenTurns: 0,
+                turn: 'p1', attacksRemaining: 2, stats: { damageDealt: 0, turns: 0 }
+            },
+            selectedFighterIndex: null, pendingAttackSlot: null, activePiFighter: null,
+
+            openModal(id) { 
+                if (id === 'rulesModal') this.renderPersonas();
+                document.getElementById(id).classList.remove('hidden'); 
+            },
+            closeModal(id) { document.getElementById(id).classList.add('hidden'); },
+
+            playCutscene(fighter, callback) {
+                const overlay = document.getElementById('cutsceneOverlay');
+                const badge = document.getElementById('cutsceneTier');
+                const title = document.getElementById('cutsceneTitle');
+                const ability = document.getElementById('cutsceneAbility');
+                const desc = document.getElementById('cutsceneDesc');
+
+                badge.className = `cutscene-tier tier-${fighter.tier}`;
+                badge.innerText = `${fighter.tier} TIER`;
+                title.innerText = fighter.name.toUpperCase();
+                ability.innerText = `✨ ${fighter.abilityName || 'ABILITY ACTIVATED'} ✨`;
+                desc.innerText = fighter.desc;
+
+                overlay.classList.remove('hidden');
+                SoundFX.play('cutscene');
+
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    if (callback) callback();
+                }, 1600);
+            },
+
+            renderPersonas() {
+                let html = '';
+                FIGHTER_ROSTER.forEach(f => {
+                    html += `
+                        <div style="background:#1e293b; padding:6px 10px; border-radius:6px; font-size:11px;">
+                            <span class="tier-badge tier-${f.tier}">${f.tier} TIER</span>
+                            <strong style="color:#fff; margin-left:4px;">${f.name}</strong> 
+                            <span style="color:#fbbf24;">(${f.persona})</span>: <span style="color:#a7f3d0;">${f.desc}</span>
+                        </div>`;
+                });
+                document.getElementById('personaList').innerHTML = html;
+            },
+
+            startVsAI() {
+                document.getElementById('lobbyScreen').classList.add('hidden');
+                document.getElementById('gameScreen').classList.remove('hidden');
+                document.getElementById('statusBadge').innerText = "Vs AI Bot Match";
+                this.initMatch();
+            },
+
+            createRoom() {
+                const code = "AMAL" + Math.floor(100 + Math.random() * 900);
+                alert("Room Created! Room Code: " + code);
+                this.closeModal('roomModal');
+                this.startVsAI();
+            },
+
+            joinRoom() {
+                const code = document.getElementById('roomCodeInput').value.trim();
+                if (!code) { alert("Please enter a valid room code."); return; }
+                alert("Connected to Room " + code + "!");
+                this.closeModal('roomModal');
+                this.startVsAI();
+            },
+
+            draftCards() {
+                const pool = [...FIGHTER_ROSTER];
+                const drafted = [];
+                for (let i = 0; i < 5; i++) {
+                    const rand = Math.random();
+                    let available = pool;
+                    if (rand < 0.10) {
+                        const sTier = pool.filter(f => f.tier === 'S');
+                        if (sTier.length > 0) available = sTier;
+                    } else {
+                        available = pool.filter(f => f.tier !== 'S');
+                    }
+                    const idx = Math.floor(Math.random() * available.length);
+                    drafted.push({ ...available[idx], uniqueId: Math.random().toString(36).substr(2, 9) });
+                }
+                return drafted;
+            },
+
+            draftSupports() {
+                const shuffled = [...SUPPORT_TYPES].sort(() => 0.5 - Math.random());
+                return shuffled.slice(0, 3).map(s => ({ ...s, used: false, uniqueId: Math.random().toString(36).substr(2, 9) }));
+            },
+
+            initMatch() {
+                this.state = {
+                    p1Hp: 3000, p2Hp: 3000,
+                    p1Hand: this.draftCards(), p2Hand: this.draftCards(),
+                    p1Active: [null, null, null], p2Active: [null, null, null],
+                    p1Supports: this.draftSupports(), p2Supports: this.draftSupports(),
+                    p1FrozenTurns: 0, p2FrozenTurns: 0,
+                    turn: 'p1', attacksRemaining: 2, stats: { damageDealt: 0, turns: 1 }
+                };
+                this.log("Match started! S-Tier draft rate set to 10%.");
+                this.updateUI();
+            },
+
+            log(msg) {
+                const box = document.getElementById('logBox');
+                if (!box) return;
+                const div = document.createElement('div');
+                div.innerText = `> ${msg}`;
+                box.appendChild(div);
+                requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
+            },
+
+            showBanner(txt) {
+                const b = document.getElementById('abilityBanner');
+                if (!b) return;
+                b.innerText = txt;
+                b.style.display = 'block';
+                setTimeout(() => { b.style.display = 'none'; }, 3000);
+            },
+
+            deployFighter(index) {
+                if (this.state.turn !== 'p1') return;
+                const emptySlot = this.state.p1Active.indexOf(null);
+                if (emptySlot === -1) { alert("All active slots are occupied!"); return; }
+                const fighter = this.state.p1Hand.splice(index, 1)[0];
+                this.state.p1Active[emptySlot] = { ...fighter, hasAttacked: false, timer: fighter.cooldown };
+                SoundFX.play('deploy');
+                this.log(`Deployed ${fighter.name} to slot ${emptySlot + 1}.`);
+                this.updateUI();
+            },
+
+            triggerAbility(index) {
+                const f = this.state.p1Active[index];
+                if (!f || f.timer > 0) return;
+
+                this.playCutscene(f, () => {
+                    SoundFX.play('ability');
+                    f.timer = f.cooldown;
+
+                    if (f.id === 'ghizel') {
+                        f.hp = Math.min(f.maxHp, f.hp + Math.round(f.maxHp * 0.25));
+                        f.atk *= 3;
+                        this.showBanner(`Miss Ghizel Aura: Heals 25% HP & Tripled ATK!`);
+                    } else if (f.id === 'brahim') {
+                        this.activePiFighter = f;
+                        this.openModal('piModal');
+                        return;
+                    } else if (f.id === 'rawa') {
+                        this.state.p2FrozenTurns += 2;
+                        this.showBanner(`Miss Rawa: Shut Up! Opponent frozen for 2 turns!`);
+                        this.log(`Miss Rawa locked enemy turn for 2 full rounds!`);
+                    } else if (f.id === 'lila') {
+                        const enemyFighters = this.state.p2Active.filter(x => x !== null);
+                        if (enemyFighters.length > 0) {
+                            const target = enemyFighters[0];
+                            const stolen = Math.round(target.hp * 0.5);
+                            target.hp -= stolen;
+                            f.hp = Math.min(f.maxHp, f.hp + stolen);
+                            this.showBanner(`Miss Lila stolen ${stolen} HP from enemy!`);
+                        }
+                    } else if (f.id === 'joumana') {
+                        const sacrifice = Math.round(f.hp * 0.3);
+                        f.hp -= sacrifice;
+                        f.atk = Math.round(f.atk * 1.7);
+                        this.showBanner(`Miss Joumana: Sacrificed HP for +70% ATK!`);
+                    } else if (f.id === 'lilan') {
+                        f.atk += 400;
+                        this.showBanner(`Miss Lilan: Cloud Plants (+400 ATK)!`);
+                    } else if (f.id === 'kameel') {
+                        this.state.p2FrozenTurns += 1;
+                        f.atk *= 2;
+                        this.showBanner(`Mr. Kameel Frog Eyes: Skipped enemy turn & 2x ATK!`);
+                        this.log(`Mr. Kameel locked enemy for 1 turn!`);
+                    } else if (f.id === 'maher') {
+                        this.state.p2FrozenTurns += 1;
+                        this.showBanner(`Mr. Maher Talks Too Much: Enemy turn skipped!`);
+                        this.log(`Mr. Maher forced enemy to skip 1 turn!`);
+                    } else if (f.id === 'nada') {
+                        f.atk *= 2;
+                        this.showBanner(`Miss Nada: Double Attack activated!`);
+                    }
+                    this.updateUI();
+                });
+            },
+
+            clickActiveFighter(index) {
+                const f = this.state.p1Active[index];
+                if (!f) return;
+                if (this.state.turn !== 'p1') { alert("Not your turn!"); return; }
+                
+                if (f.timer === 0) {
+                    this.triggerAbility(index);
+                    return;
+                }
+
+                if (f.hasAttacked) { alert("Fighter has already attacked!"); return; }
+                if (this.state.attacksRemaining <= 0) { alert("No attacks remaining!"); return; }
+
+                const activeEnemyCount = this.state.p2Active.filter(x => x !== null).length;
+                this.pendingAttackSlot = index;
+
+                if (activeEnemyCount > 0) {
+                    let html = '';
+                    this.state.p2Active.forEach((ef, ei) => {
+                        if (ef) {
+                            html += `<button class="btn" style="background:#1e293b; justify-content:space-between;" onclick="GameEngine.executeAttack(${index}, 'enemy_fighter', ${ei})"><span>⚔️ ${ef.name} (${ef.persona})</span> <span>HP: ${ef.hp}/${ef.maxHp} | ATK: ${ef.atk}</span></button>`;
+                        }
+                    });
+                    document.getElementById('targetList').innerHTML = html;
+                    this.openModal('targetModal');
+                } else {
+                    this.executeAttack(index, 'enemy_player', 0);
+                }
+            },
+
+            executeAttack(attackerIdx, targetType, targetIdx) {
+                this.closeModal('targetModal');
+                const attacker = this.state.p1Active[attackerIdx];
+                if (!attacker) return;
+
+                SoundFX.play('attack');
+                let dmg = attacker.atk;
+                this.state.stats.damageDealt += dmg;
+
+                if (targetType === 'enemy_fighter') {
+                    const defender = this.state.p2Active[targetIdx];
+                    if (!defender) return;
+                    defender.hp -= dmg;
+                    this.log(`Your ${attacker.name} attacked ${defender.name} for ${dmg} DMG!`);
+                    if (defender.hp <= 0) {
+                        this.log(`Enemy ${defender.name} defeated!`);
+                        this.state.p2Active[targetIdx] = null;
+                    }
+                } else {
+                    this.state.p2Hp = Math.max(0, this.state.p2Hp - dmg);
+                    this.log(`Your ${attacker.name} attacked Direct Enemy for ${dmg} DMG!`);
+                    if (this.state.p2Hp <= 0) {
+                        this.triggerGameOver(true);
+                        return;
+                    }
+                }
+
+                attacker.hasAttacked = true;
+                this.state.attacksRemaining--;
+                this.updateUI();
+
+                if (this.state.attacksRemaining <= 0) {
+                    setTimeout(() => this.endTurn(), 800);
+                }
+            },
+
+            useSupport(player, index) {
+                const supports = player === 'p1' ? this.state.p1Supports : this.state.p2Supports;
+                const supp = supports[index];
+                if (supp.used) return;
+
+                supp.used = true;
+                SoundFX.play('support');
+                this.log(`${player === 'p1' ? 'You' : 'Bot'} used ${supp.name}!`);
+
+                if (supp.id === 'heal') {
+                    if (player === 'p1') {
+                        let html = `<button class="btn" onclick="GameEngine.resolveHeal('player', 0)">💖 Restore 600 Player HP</button>`;
+                        this.state.p1Active.forEach((f, fi) => {
+                            if (f) html += `<button class="btn" style="background:#1e293b;" onclick="GameEngine.resolveHeal('fighter', ${fi})">💖 Heal ${f.name} (+600 HP)</button>`;
+                        });
+                        document.getElementById('healList').innerHTML = html;
+                        this.openModal('healModal');
+                    } else {
+                        this.state.p2Hp = Math.min(3000, this.state.p2Hp + 600);
+                        SoundFX.play('heal');
+                        this.showBanner("Bot used Heal Support (+600 HP)!");
+                    }
+                } else {
+                    this.showBanner(`${supp.name} Activated!`);
+                }
+                this.updateUI();
+            },
+
+            resolveHeal(targetType, idx) {
+                this.closeModal('healModal');
+                SoundFX.play('heal');
+                if (targetType === 'player') {
+                    this.state.p1Hp = Math.min(3000, this.state.p1Hp + 600);
+                    this.log("Restored 600 Player HP!");
+                } else {
+                    const f = this.state.p1Active[idx];
+                    if (f) {
+                        f.hp = Math.min(f.maxHp, f.hp + 600);
+                        this.log(`Restored 600 HP to ${f.name}!`);
+                    }
+                }
+                this.updateUI();
+            },
+
+            endTurn() {
+                if (this.state.turn !== 'p1') return;
+                this.log("Ending turn...");
+                
+                this.state.p1Active.forEach(f => {
+                    if (f && f.timer > 0) f.timer--;
+                });
+
+                if (this.state.p2FrozenTurns > 0) {
+                    this.state.p2FrozenTurns--;
+                    this.log(`⚠️ Opponent is frozen! Skipping Bot's turn (${this.state.p2FrozenTurns} freeze remaining).`);
+                    this.showBanner(`Opponent Turn Skipped!`);
+                    this.state.attacksRemaining = 2;
+                    this.state.p1Active.forEach(f => { if (f) f.hasAttacked = false; });
+                    this.updateUI();
+                    return;
+                }
+
+                this.state.turn = 'p2';
+                this.updateUI();
+                setTimeout(() => this.runBotTurn(), 1000);
+            },
+
+            runBotTurn() {
+                this.state.stats.turns++;
+                
+                while (this.state.p2Active.includes(null) && this.state.p2Hand.length > 0) {
+                    const emptyIdx = this.state.p2Active.indexOf(null);
+                    const f = this.state.p2Hand.pop();
+                    this.state.p2Active[emptyIdx] = { ...f, hasAttacked: false, timer: f.cooldown };
+                    this.log(`Bot deployed ${f.name} to slot ${emptyIdx + 1}.`);
+                }
+
+                this.state.p2Active.forEach((botFighter) => {
+                    if (!botFighter) return;
+                    const activePlayerFighters = this.state.p1Active.filter(x => x !== null);
+                    if (activePlayerFighters.length > 0) {
+                        const targetIdx = this.state.p1Active.findIndex(x => x !== null);
+                        if (targetIdx !== -1) {
+                            const target = this.state.p1Active[targetIdx];
+                            target.hp -= botFighter.atk;
+                            SoundFX.play('attack');
+                            this.log(`Bot's ${botFighter.name} attacked your ${target.name} for ${botFighter.atk} DMG!`);
+                            if (target.hp <= 0) {
+                                this.log(`Your ${target.name} was defeated!`);
+                                this.state.p1Active[targetIdx] = null;
+                            }
+                        }
+                    } else {
+                        this.state.p1Hp = Math.max(0, this.state.p1Hp - botFighter.atk);
+                        SoundFX.play('attack');
+                        this.log(`Bot's ${botFighter.name} attacked you directly for ${botFighter.atk} DMG!`);
+                        if (this.state.p1Hp <= 0) {
+                            this.triggerGameOver(false);
+                            return;
+                        }
+                    }
+                });
+
+                if (this.state.p1Hp > 0) {
+                    if (this.state.p1FrozenTurns > 0) {
+                        this.state.p1FrozenTurns--;
+                        this.log(`⚠️ You are frozen! Skipping your turn.`);
+                        this.updateUI();
+                        setTimeout(() => this.runBotTurn(), 1000);
+                        return;
+                    }
+
+                    this.state.turn = 'p1';
+                    this.state.attacksRemaining = 2;
+                    this.state.p1Active.forEach(f => { if (f) f.hasAttacked = false; });
+                    this.log("Your turn! 2 attacks available.");
+                }
+                this.updateUI();
+            },
+
+            submitPi() {
+                const val = document.getElementById('piInput').value.trim();
+                const correctPi = "1415926535";
+                let correctCount = 0;
+                for (let i = 0; i < val.length; i++) {
+                    if (val[i] === correctPi[i]) correctCount++;
+                    else break;
+                }
+                const bonus = 1 + (correctCount * 0.2);
+                if (this.activePiFighter) {
+                    this.activePiFighter.atk = Math.round(this.activePiFighter.atk * bonus);
+                    SoundFX.play('ability');
+                    this.log(`Mr. Brahim Pi Boost: +${correctCount * 20}% ATK!`);
+                    this.showBanner(`Mr. Brahim Pi Boost: +${correctCount * 20}% ATK!`);
+                }
+                this.closeModal('piModal');
+                this.updateUI();
+            },
+
+            triggerGameOver(isWin) {
+                const title = document.getElementById('winTitle');
+                const sub = document.getElementById('winSub');
+                const stats = document.getElementById('gameStats');
+                if (isWin) {
+                    SoundFX.play('win');
+                    title.innerText = "VICTORY!";
+                    title.style.color = "var(--accent-green)";
+                    sub.innerText = "Enemy forces defeated!";
+                } else {
+                    SoundFX.play('lose');
+                    title.innerText = "DEFEAT";
+                    title.style.color = "var(--accent-red)";
+                    sub.innerText = "Your HP was reduced to zero!";
+                }
+                stats.innerText = `Total Turns: ${this.state.stats.turns} | Total Damage Dealt: ${this.state.stats.damageDealt}`;
+                this.openModal('gameOverModal');
+            },
+
+            resetToMenu() {
+                this.closeModal('gameOverModal');
+                document.getElementById('gameScreen').classList.add('hidden');
+                document.getElementById('lobbyScreen').classList.remove('hidden');
+                document.getElementById('statusBadge').innerText = "Main Menu";
+            },
+
+            updateUI() {
+                const p1Pct = (this.state.p1Hp / 3000) * 100;
+                const p2Pct = (this.state.p2Hp / 3000) * 100;
+                document.getElementById('p1HpBar').style.width = p1Pct + '%';
+                document.getElementById('p1HpText').innerText = `${this.state.p1Hp} / 3000 HP`;
+                document.getElementById('p2HpBar').style.width = p2Pct + '%';
+                document.getElementById('p2HpText').innerText = `${this.state.p2Hp} / 3000 HP`;
+
+                document.getElementById('p1Title').innerText = `You (Player 1) ${this.state.p1FrozenTurns > 0 ? '🧊 FROZEN (' + this.state.p1FrozenTurns + 'T)' : ''}`;
+                document.getElementById('p2Title').innerText = `Opponent (Bot) ${this.state.p2FrozenTurns > 0 ? '🧊 FROZEN (' + this.state.p2FrozenTurns + 'T)' : ''}`;
+
+                const turnInfo = document.getElementById('turnInfo');
+                const endBtn = document.getElementById('endTurnBtn');
+                if (this.state.turn === 'p1') {
+                    turnInfo.innerText = `YOUR TURN (${this.state.attacksRemaining} ATTACKS REMAINING)`;
+                    turnInfo.style.color = 'var(--accent-green)';
+                    endBtn.disabled = false;
+                } else {
+                    turnInfo.innerText = "OPPONENT (BOT) TURN...";
+                    turnInfo.style.color = 'var(--accent-red)';
+                    endBtn.disabled = true;
+                }
+
+                let p1SupHtml = '';
+                this.state.p1Supports.forEach((s, i) => {
+                    p1SupHtml += `<div class="support-card ${s.used ? 'used' : ''}" onclick="GameEngine.useSupport('p1', ${i})" title="${s.name}">${s.symbol}</div>`;
+                });
+                document.getElementById('p1Supports').innerHTML = p1SupHtml;
+
+                let p2SupHtml = '';
+                this.state.p2Supports.forEach((s, i) => {
+                    p2SupHtml += `<div class="support-card ${s.used ? 'used' : ''}" title="Secret Support">${s.used ? s.symbol : '❓'}</div>`;
+                });
+                document.getElementById('p2Supports').innerHTML = p2SupHtml;
+
+                let p1BoardHtml = '';
+                this.state.p1Active.forEach((f, i) => {
+                    if (f) {
+                        const isReady = f.timer === 0;
+                        p1BoardHtml += `
+                            <div class="fighter-card ${isReady ? 'ability-ready' : ''} ${f.hasAttacked ? 'exhausted' : ''}" onclick="GameEngine.clickActiveFighter(${i})">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span class="tier-badge tier-${f.tier}">${f.tier} TIER</span>
+                                        <span style="font-size:9px; color:${isReady ? 'var(--accent-gold)' : 'var(--text-muted)'}; font-weight:bold;">${isReady ? '⚡ ABILITY READY!' : 'CD: ' + f.timer + 'T'}</span>
+                                    </div>
+                                    <div style="font-size: 13px; font-weight: bold; margin-top: 4px;">${f.name}</div>
+                                    <div class="persona-tag">${f.persona}</div>
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-muted); margin: 4px 0;">HP: ${f.hp}/${f.maxHp} | ATK: ${f.atk}</div>
+                                <div style="font-size: 10px; color: var(--accent-green); margin-bottom: 6px; font-style: italic;">✨ ${f.desc}</div>
+                                <button class="btn ${isReady ? 'btn-gold' : (f.hasAttacked ? '' : 'btn-green')}" style="width: 100%; font-size: 10px; padding: 4px;">${isReady ? 'Trigger Ability ✨' : (f.hasAttacked ? 'Exhausted' : 'Attack ⚔️')}</button>
+                            </div>`;
+                    } else {
+                        p1BoardHtml += `<div style="border: 2px dashed #2e3a54; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #4b5563; font-size: 11px; min-height: 120px;">Empty Slot ${i + 1}</div>`;
+                    }
+                });
+                document.getElementById('p1ActiveBoard').innerHTML = p1BoardHtml;
+
+                let p2BoardHtml = '';
+                this.state.p2Active.forEach((f, i) => {
+                    if (f) {
+                        p2BoardHtml += `
+                            <div class="fighter-card">
+                                <div>
+                                    <span class="tier-badge tier-${f.tier}">${f.tier} TIER</span>
+                                    <div style="font-size: 13px; font-weight: bold; margin-top: 4px;">${f.name}</div>
+                                    <div class="persona-tag">${f.persona}</div>
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-muted); margin: 4px 0;">HP: ${f.hp}/${f.maxHp} | ATK: ${f.atk}</div>
+                                <div style="font-size: 10px; color: var(--accent-red); margin-bottom: 6px; font-style: italic;">✨ ${f.desc}</div>
+                                <div style="font-size: 10px; color: var(--accent-red); text-align: center; font-weight: bold;">ACTIVE ENEMY</div>
+                            </div>`;
+                    } else {
+                        p2BoardHtml += `<div style="border: 2px dashed #2e3a54; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #4b5563; font-size: 11px; min-height: 120px;">Bot Slot ${i + 1}</div>`;
+                    }
+                });
+                document.getElementById('p2ActiveBoard').innerHTML = p2BoardHtml;
+                document.getElementById('p2HandCount').innerText = `Reserve: ${this.state.p2Hand.length} Cards`;
+
+                let handHtml = '';
+                this.state.p1Hand.forEach((f, i) => {
+                    handHtml += `
+                        <div class="fighter-card" style="min-width: 130px; cursor: pointer;" onclick="GameEngine.deployFighter(${i})">
+                            <div>
+                                <span class="tier-badge tier-${f.tier}">${f.tier} TIER</span>
+                                <div style="font-size: 12px; font-weight: bold; margin-top: 4px;">${f.name}</div>
+                                <div class="persona-tag">${f.persona}</div>
+                            </div>
+                            <div style="font-size: 10px; color: var(--text-muted); margin: 2px 0;">HP: ${f.hp} | ATK: ${f.atk}</div>
+                            <div style="font-size: 9px; color: var(--accent-green); margin-bottom: 4px; line-height: 1.1;">${f.desc}</div>
+                            <button class="btn btn-blue" style="width: 100%; font-size: 10px; padding: 4px;">Deploy ⬆️</button>
+                        </div>`;
+                });
+                document.getElementById('p1HandBoard').innerHTML = handHtml || '<div style="color: #6b7280; font-size: 11px; padding: 10px;">No reserve fighters left in hand.</div>';
+            }
+        };
+    </script>
+</body>
+</html>
