@@ -308,7 +308,7 @@
             <div class="panel">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <span style="font-size: 11px; font-weight: 800; color: #f3f4f6;">🖐️ Reserve Hand (Tap card to deploy)</span>
-                    <span style="font-size: 10px; font-weight: 900; color: #f59e0b;">12% S-TIER CHANCE</span>
+                    <span id="sTierChanceLabel" style="font-size: 10px; font-weight: 900; color: #f59e0b;">9% S-TIER CHANCE</span>
                 </div>
                 <div id="p1HandBoard" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;"></div>
             </div>
@@ -389,7 +389,6 @@
                 <ul>
                     <li>💖 <b>Heal:</b> Restores +600 HP to player or chosen fighter.</li>
                     <li>💨 <b>Evade:</b> Dodges incoming opponent strike.</li>
-                    <li>🌀 <b>Merge:</b> Heals active friendly units.</li>
                     <li>⚡ <b>Extra Credit:</b> Grants +200 ATK bonus to active cards.</li>
                     <li>🛑 <b>Detention Slip:</b> Forces enemy turn skip.</li>
                     <li>🔔 <b>School Bell:</b> Instantly resets ability cooldown timers.</li>
@@ -465,7 +464,6 @@
         const SUPPORT_TYPES = [
             { id: 'heal', symbol: '💖', name: 'Heal Support' },
             { id: 'evade', symbol: '💨', name: 'Evade Support' },
-            { id: 'merge', symbol: '🌀', name: 'Merge Support' },
             { id: 'extra', symbol: '⚡', name: 'Extra Credit' },
             { id: 'detention', symbol: '🛑', name: 'Detention Slip' },
             { id: 'bell', symbol: '🔔', name: 'School Bell' }
@@ -477,6 +475,7 @@
                 p1Hand: [], p2Hand: [],
                 p1Active: [null, null, null], p2Active: [null, null, null],
                 p1Supports: [], p2Supports: [],
+                p1Evade: false, p2Evade: false,
                 turn: 'p1', attacksRemaining: 2, frozenTurns: 0, stats: { damageDealt: 0, turns: 0 }
             },
             myRole: 'p1',
@@ -679,13 +678,16 @@
                 }
             },
 
-            draftCards() {
+            draftCards(forTarget = 'p1') {
                 const pool = [...FIGHTER_ROSTER];
                 const drafted = [];
+                // S-Tier chance set to 9% across all human players and bot match
+                const sTierThreshold = 0.09;
+
                 for (let i = 0; i < 5; i++) {
                     const rand = Math.random();
                     let available = pool;
-                    if (rand < 0.12) {
+                    if (rand < sTierThreshold) {
                         const sTier = pool.filter(f => f.tier === 'S');
                         if (sTier.length > 0) available = sTier;
                     }
@@ -703,12 +705,13 @@
             initMatch() {
                 this.state = {
                     p1Hp: 3000, p2Hp: 3000,
-                    p1Hand: this.draftCards(), p2Hand: this.draftCards(),
+                    p1Hand: this.draftCards('p1'), p2Hand: this.draftCards('p2'),
                     p1Active: [null, null, null], p2Active: [null, null, null],
                     p1Supports: this.draftSupports(), p2Supports: this.draftSupports(),
+                    p1Evade: false, p2Evade: false,
                     turn: 'p1', attacksRemaining: 2, frozenTurns: 0, stats: { damageDealt: 0, turns: 1 }
                 };
-                this.log("Match started! 12% S-Tier drop rate active.");
+                this.log(`Match started! 9% S-Tier drop rate active.`);
                 this.syncState();
                 this.updateUI();
             },
@@ -923,7 +926,30 @@
                 const attackerBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
                 const defenderBoard = player === 'p1' ? this.state.p2Active : this.state.p1Active;
                 const attacker = attackerBoard[attackerIdx];
-                if (!attacker) return;
+                if (!attacker || attacker.hasAttacked) return;
+
+                // Check Evade Support status on defender side
+                const isDefenderP1 = (player === 'p2');
+                const hasEvade = isDefenderP1 ? this.state.p1Evade : this.state.p2Evade;
+
+                if (hasEvade) {
+                    if (isDefenderP1) this.state.p1Evade = false;
+                    else this.state.p2Evade = false;
+
+                    const boardId = player === 'p1' ? 'opponentPanel' : 'playerPanel';
+                    this.spawnFloatingText(boardId, `EVADED!`, '#3b82f6');
+                    this.log(`💨 Attack was completely EVADED by the defender's Evade Support!`);
+                    
+                    attacker.hasAttacked = true;
+                    this.state.attacksRemaining--;
+                    this.syncState();
+                    this.updateUI();
+
+                    if (this.state.attacksRemaining <= 0 && this.state.turn === this.myRole) {
+                        setTimeout(() => this.endTurn(), 800);
+                    }
+                    return;
+                }
 
                 SoundFX.play('attack');
                 this.triggerScreenShake();
@@ -1008,7 +1034,11 @@
                 const supp = supports[index];
                 if (supp) supp.used = true;
 
-                if (targetType === 'player') {
+                if (supp && supp.id === 'evade') {
+                    if (player === 'p1') this.state.p1Evade = true;
+                    else this.state.p2Evade = true;
+                    this.showBanner(`💨 EVADE SUPPORT ACTIVATED: Will dodge the next attack!`);
+                } else if (targetType === 'player') {
                     if (player === 'p1') {
                         this.state.p1Hp = Math.min(3000, this.state.p1Hp + 600);
                         this.spawnFloatingText('playerPanel', `+600`, '#10b981');
@@ -1184,6 +1214,11 @@
                 document.getElementById('p1HpText').innerText = myHp;
                 document.getElementById('p2HpBar').style.width = oppPct + '%';
                 document.getElementById('p2HpText').innerText = opponentHp;
+
+                const chanceLabel = document.getElementById('sTierChanceLabel');
+                if (chanceLabel) {
+                    chanceLabel.innerText = "9% S-TIER CHANCE";
+                }
                 
                 const roleLabel = document.getElementById('myRoleLabel');
                 if (roleLabel) roleLabel.innerText = this.myRole === 'p1' ? 'Player 1' : 'Player 2';
