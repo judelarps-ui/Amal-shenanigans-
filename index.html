@@ -312,13 +312,16 @@
                 p1Supports: [], p2Supports: [],
                 turn: 'p1', attacksRemaining: 2, frozenTurns: 0, stats: { damageDealt: 0, turns: 0 }
             },
+            myRole: 'p1',
             selectedFighterIndex: null, pendingAttackSlot: null, activePiFighter: null,
-            peer: null, conn: null, isHost: false,
+            peer: null, conn: null, isHost: false, isOnline: false,
 
             openModal(id) { document.getElementById(id).classList.remove('hidden'); },
             closeModal(id) { document.getElementById(id).classList.add('hidden'); },
 
             startVsAI() {
+                this.isOnline = false;
+                this.myRole = 'p1';
                 document.getElementById('lobbyScreen').classList.add('hidden');
                 document.getElementById('gameScreen').classList.remove('hidden');
                 document.getElementById('statusBadge').innerText = "Vs AI Bot Match";
@@ -330,15 +333,20 @@
                 try {
                     this.peer = new Peer();
                     this.peer.on('open', (id) => {
-                        alert("Room Created! Room Code: " + id + "\nShare this code with your friend!");
+                        const codeInput = document.getElementById('peerCodeInput');
+                        if (codeInput) codeInput.value = id;
+                        alert("Room Created!\n\nShare this Room Code with your friend:\n" + id);
                         document.getElementById('roomModal').classList.add('hidden');
                         document.getElementById('lobbyScreen').classList.add('hidden');
                         document.getElementById('gameScreen').classList.remove('hidden');
-                        document.getElementById('statusBadge').innerText = "Online Host (Waiting...)";
+                        document.getElementById('statusBadge').innerText = "Host (Waiting for opponent...)";
                         document.getElementById('p2NameLabel').innerText = "Waiting for Player 2...";
                         this.isHost = true;
+                        this.isOnline = true;
+                        this.myRole = 'p1';
                         this.initMatch();
                     });
+
                     this.peer.on('connection', (connection) => {
                         this.conn = connection;
                         document.getElementById('statusBadge').innerText = "Online Connected!";
@@ -347,8 +355,12 @@
                         this.syncState();
                         this.log("Friend connected to your room!");
                     });
+
+                    this.peer.on('error', (err) => {
+                        alert("PeerJS Error: " + err.type);
+                    });
                 } catch(e) {
-                    alert("Failed to create online room.");
+                    alert("Failed to create online room: " + e.message);
                 }
             },
 
@@ -359,6 +371,10 @@
                     this.peer = new Peer();
                     this.peer.on('open', () => {
                         this.conn = this.peer.connect(code);
+                        this.isHost = false;
+                        this.isOnline = true;
+                        this.myRole = 'p2';
+
                         this.conn.on('open', () => {
                             alert("Successfully joined room!");
                             document.getElementById('roomModal').classList.add('hidden');
@@ -366,12 +382,15 @@
                             document.getElementById('gameScreen').classList.remove('hidden');
                             document.getElementById('statusBadge').innerText = "Online Connected!";
                             document.getElementById('p2NameLabel').innerText = "Host (Player 1)";
-                            this.isHost = false;
                             this.setupPeerListeners();
+                        });
+
+                        this.conn.on('error', (err) => {
+                            alert("Connection Error: " + err);
                         });
                     });
                 } catch(e) {
-                    alert("Failed to join room.");
+                    alert("Failed to join room: " + e.message);
                 }
             },
 
@@ -381,7 +400,13 @@
                     if (data.type === 'SYNC_STATE') {
                         this.state = data.state;
                         this.updateUI();
+                    } else if (data.type === 'ACTION') {
+                        this.handleRemoteAction(data.action);
                     }
+                });
+                this.conn.on('close', () => {
+                    alert("Opponent disconnected!");
+                    this.resetToMenu();
                 });
             },
 
@@ -391,13 +416,34 @@
                 }
             },
 
+            sendAction(action) {
+                if (this.isOnline && this.conn && this.conn.open) {
+                    this.conn.send({ type: 'ACTION', action: action });
+                }
+            },
+
+            handleRemoteAction(action) {
+                if (action.type === 'DEPLOY') {
+                    this.executeDeploy(action.player, action.index);
+                } else if (action.type === 'ATTACK') {
+                    this.executeAttackLogic(action.attackerIdx, action.targetType, action.targetIdx, action.player);
+                } else if (action.type === 'END_TURN') {
+                    this.executeEndTurn(action.player);
+                } else if (action.type === 'FUSION') {
+                    this.executeNightmareFusion(action.player);
+                } else if (action.type === 'ABILITY') {
+                    this.executeAbility(action.player, action.index, action.piBonus);
+                } else if (action.type === 'SUPPORT') {
+                    this.executeSupport(action.player, action.index, action.targetType, action.targetIdx);
+                }
+            },
+
             draftCards() {
                 const pool = [...FIGHTER_ROSTER];
                 const drafted = [];
                 for (let i = 0; i < 5; i++) {
                     const rand = Math.random();
                     let available = pool;
-                    // Exactly 12% S-tier probability for BOTH players and bots
                     if (rand < 0.12) {
                         const sTier = pool.filter(f => f.tier === 'S');
                         if (sTier.length > 0) available = sTier;
@@ -421,7 +467,8 @@
                     p1Supports: this.draftSupports(), p2Supports: this.draftSupports(),
                     turn: 'p1', attacksRemaining: 2, frozenTurns: 0, stats: { damageDealt: 0, turns: 1 }
                 };
-                this.log("Match started! 12% S-Tier drop rate active for both players & bots.");
+                this.log("Match started! 12% S-Tier drop rate active for all players.");
+                this.syncState();
                 this.updateUI();
             },
 
@@ -443,22 +490,48 @@
             },
 
             deployFighter(index) {
-                if (this.state.turn !== 'p1') return;
-                const emptySlot = this.state.p1Active.indexOf(null);
-                if (emptySlot === -1) { alert("All 3 active slots are full!"); return; }
-                const fighter = this.state.p1Hand.splice(index, 1)[0];
-                this.state.p1Active[emptySlot] = { ...fighter, hasAttacked: false, timer: fighter.cooldown };
-                this.log(`You deployed ${fighter.name}.`);
+                if (this.state.turn !== this.myRole) { alert("Not your turn!"); return; }
+                const player = this.myRole;
+                if (this.executeDeploy(player, index)) {
+                    this.sendAction({ type: 'DEPLOY', player, index });
+                }
+            },
+
+            executeDeploy(player, index) {
+                const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const handBoard = player === 'p1' ? this.state.p1Hand : this.state.p2Hand;
+                const emptySlot = activeBoard.indexOf(null);
+                
+                if (emptySlot === -1) { 
+                    if (player === this.myRole) alert("All 3 active slots are full!"); 
+                    return false; 
+                }
+                const fighter = handBoard.splice(index, 1)[0];
+                if (!fighter) return false;
+                
+                activeBoard[emptySlot] = { ...fighter, hasAttacked: false, timer: fighter.cooldown };
+                this.log(`${player === 'p1' ? 'Player 1' : 'Player 2'} deployed ${fighter.name}.`);
                 this.syncState();
                 this.updateUI();
+                return true;
             },
 
             triggerNightmareFusion() {
-                const ritaIdx = this.state.p1Active.findIndex(f => f && f.id === 'rita');
-                const joumanaIdx = this.state.p1Active.findIndex(f => f && f.id === 'joumana');
+                if (this.state.turn !== this.myRole) return;
+                const player = this.myRole;
+                if (this.executeNightmareFusion(player)) {
+                    this.sendAction({ type: 'FUSION', player });
+                }
+            },
+
+            executeNightmareFusion(player) {
+                const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const ritaIdx = activeBoard.findIndex(f => f && f.id === 'rita');
+                const joumanaIdx = activeBoard.findIndex(f => f && f.id === 'joumana');
+                
                 if (ritaIdx === -1 || joumanaIdx === -1) {
-                    alert("You need both Miss Rita and Miss Joumana active on your board to perform the Nightmare Duo Fusion!");
-                    return;
+                    if (player === this.myRole) alert("You need both Miss Rita and Miss Joumana active on your board!");
+                    return false;
                 }
 
                 SoundFX.play('ability');
@@ -475,17 +548,38 @@
                     desc: 'Merged Fusion entity with devastating stats.'
                 };
 
-                this.state.p1Active[ritaIdx] = fusionFighter;
-                this.state.p1Active[joumanaIdx] = null;
+                activeBoard[ritaIdx] = fusionFighter;
+                activeBoard[joumanaIdx] = null;
                 this.showBanner(`🔥 FUSION ACTIVATED: Nightmare Duo unleashed onto the board!`);
                 this.syncState();
                 this.updateUI();
+                return true;
             },
 
             triggerAbility(index) {
-                const f = this.state.p1Active[index];
+                if (this.state.turn !== this.myRole) return;
+                const player = this.myRole;
+                const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const f = activeBoard[index];
                 if (!f || f.timer > 0) return;
-                
+
+                if (f.id === 'brahim') {
+                    this.activePiFighter = f;
+                    this.openModal('piModal');
+                    return;
+                }
+
+                if (this.executeAbility(player, index)) {
+                    this.sendAction({ type: 'ABILITY', player, index });
+                }
+            },
+
+            executeAbility(player, index, piBonus = null) {
+                const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const enemyBoard = player === 'p1' ? this.state.p2Active : this.state.p1Active;
+                const f = activeBoard[index];
+                if (!f) return false;
+
                 SoundFX.play('ability');
                 f.timer = f.cooldown;
 
@@ -498,14 +592,15 @@
                     f.atk *= 3;
                     this.showBanner(`✨ PRINCIPAL DECREE: Miss Ghizel heals 25% HP & triples ATK!`);
                 } else if (f.id === 'brahim') {
-                    this.activePiFighter = f;
-                    this.openModal('piModal');
-                    return;
+                    if (piBonus) {
+                        f.atk = Math.round(f.atk * piBonus);
+                        this.showBanner(`📐 Mr. Brahim Pi Boost: ATK Multiplied!`);
+                    }
                 } else if (f.id === 'rawa') {
                     this.state.frozenTurns = 2;
                     this.showBanner(`🛑 SHUT UP! Miss Rawa freezes enemy actions for 2 turns!`);
                 } else if (f.id === 'lila') {
-                    const enemyFighters = this.state.p2Active.filter(x => x !== null);
+                    const enemyFighters = enemyBoard.filter(x => x !== null);
                     if (enemyFighters.length > 0) {
                         const target = enemyFighters[0];
                         const stolen = Math.round(target.hp * 0.5);
@@ -534,12 +629,15 @@
                 }
                 this.syncState();
                 this.updateUI();
+                return true;
             },
 
             clickActiveFighter(index) {
-                const f = this.state.p1Active[index];
+                if (this.state.turn !== this.myRole) { alert("Not your turn!"); return; }
+                const activeBoard = this.myRole === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const enemyBoard = this.myRole === 'p1' ? this.state.p2Active : this.state.p1Active;
+                const f = activeBoard[index];
                 if (!f) return;
-                if (this.state.turn !== 'p1') { alert("Not your turn!"); return; }
                 
                 if (f.timer === 0) {
                     this.triggerAbility(index);
@@ -549,12 +647,12 @@
                 if (f.hasAttacked) { alert("Already attacked this turn!"); return; }
                 if (this.state.attacksRemaining <= 0) { alert("No attacks remaining!"); return; }
 
-                const activeEnemyCount = this.state.p2Active.filter(x => x !== null).length;
+                const activeEnemyCount = enemyBoard.filter(x => x !== null).length;
                 this.pendingAttackSlot = index;
 
                 if (activeEnemyCount > 0) {
                     let html = '';
-                    this.state.p2Active.forEach((ef, ei) => {
+                    enemyBoard.forEach((ef, ei) => {
                         if (ef) {
                             html += `<button class="btn" style="background:#1e293b; justify-content:space-between;" onclick="GameEngine.executeAttack(${index}, 'enemy_fighter', ${ei})"><span>⚔️ ${ef.name}</span> <span>HP: ${ef.hp}/${ef.maxHp}</span></button>`;
                         }
@@ -568,7 +666,15 @@
 
             executeAttack(attackerIdx, targetType, targetIdx) {
                 this.closeModal('targetModal');
-                const attacker = this.state.p1Active[attackerIdx];
+                const player = this.myRole;
+                this.executeAttackLogic(attackerIdx, targetType, targetIdx, player);
+                this.sendAction({ type: 'ATTACK', attackerIdx, targetType, targetIdx, player });
+            },
+
+            executeAttackLogic(attackerIdx, targetType, targetIdx, player) {
+                const attackerBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const defenderBoard = player === 'p1' ? this.state.p2Active : this.state.p1Active;
+                const attacker = attackerBoard[attackerIdx];
                 if (!attacker) return;
 
                 SoundFX.play('attack');
@@ -576,19 +682,26 @@
                 this.state.stats.damageDealt += dmg;
 
                 if (targetType === 'enemy_fighter') {
-                    const defender = this.state.p2Active[targetIdx];
-                    if (!defender) return;
-                    defender.hp -= dmg;
-                    this.log(`Your ${attacker.name} hit ${defender.name} for ${dmg} DMG!`);
-                    if (defender.hp <= 0) {
-                        this.log(`Enemy ${defender.name} defeated!`);
-                        this.state.p2Active[targetIdx] = null;
+                    const defender = defenderBoard[targetIdx];
+                    if (defender) {
+                        defender.hp -= dmg;
+                        this.log(`${player === 'p1' ? 'P1' : 'P2'} ${attacker.name} hit ${defender.name} for ${dmg} DMG!`);
+                        if (defender.hp <= 0) {
+                            this.log(`Fighter ${defender.name} defeated!`);
+                            defenderBoard[targetIdx] = null;
+                        }
                     }
                 } else {
-                    this.state.p2Hp = Math.max(0, this.state.p2Hp - dmg);
-                    this.log(`Your ${attacker.name} attacked enemy directly for ${dmg} DMG!`);
-                    if (this.state.p2Hp <= 0) {
-                        this.triggerGameOver(true);
+                    if (player === 'p1') {
+                        this.state.p2Hp = Math.max(0, this.state.p2Hp - dmg);
+                    } else {
+                        this.state.p1Hp = Math.max(0, this.state.p1Hp - dmg);
+                    }
+                    this.log(`${player === 'p1' ? 'P1' : 'P2'} ${attacker.name} attacked opponent directly for ${dmg} DMG!`);
+                    
+                    if (this.state.p1Hp <= 0 || this.state.p2Hp <= 0) {
+                        const isWin = (this.myRole === 'p1' && this.state.p2Hp <= 0) || (this.myRole === 'p2' && this.state.p1Hp <= 0);
+                        this.triggerGameOver(isWin);
                         return;
                     }
                 }
@@ -598,12 +711,13 @@
                 this.syncState();
                 this.updateUI();
 
-                if (this.state.attacksRemaining <= 0) {
+                if (this.state.attacksRemaining <= 0 && this.state.turn === this.myRole) {
                     setTimeout(() => this.endTurn(), 800);
                 }
             },
 
             useSupport(player, index) {
+                if (player !== this.myRole) return;
                 const supports = player === 'p1' ? this.state.p1Supports : this.state.p2Supports;
                 const supp = supports[index];
                 if (supp.used) return;
@@ -614,11 +728,14 @@
 
                 if (supp.id === 'heal') {
                     let html = `<button class="btn" onclick="GameEngine.resolveHeal('player', 0)">💖 Restore 600 Player HP</button>`;
-                    this.state.p1Active.forEach((f, fi) => {
+                    const myActive = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    myActive.forEach((f, fi) => {
                         if (f) html += `<button class="btn" style="background:#1e293b;" onclick="GameEngine.resolveHeal('fighter', ${fi})">💖 Heal ${f.name} (+600 HP)</button>`;
                     });
                     document.getElementById('healList').innerHTML = html;
                     this.openModal('healModal');
+                } else {
+                    this.sendAction({ type: 'SUPPORT', player, index, targetType: 'none', targetIdx: 0 });
                 }
                 this.syncState();
                 this.updateUI();
@@ -626,10 +743,18 @@
 
             resolveHeal(targetType, idx) {
                 this.closeModal('healModal');
+                const player = this.myRole;
+                this.executeSupport(player, 0, targetType, idx);
+                this.sendAction({ type: 'SUPPORT', player, index: 0, targetType, targetIdx: idx });
+            },
+
+            executeSupport(player, index, targetType, targetIdx) {
                 if (targetType === 'player') {
-                    this.state.p1Hp = Math.min(3000, this.state.p1Hp + 600);
-                } else {
-                    const f = this.state.p1Active[idx];
+                    if (player === 'p1') this.state.p1Hp = Math.min(3000, this.state.p1Hp + 600);
+                    else this.state.p2Hp = Math.min(3000, this.state.p2Hp + 600);
+                } else if (targetType === 'fighter') {
+                    const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    const f = activeBoard[targetIdx];
                     if (f) f.hp = Math.min(f.maxHp, f.hp + 600);
                 }
                 this.syncState();
@@ -637,16 +762,34 @@
             },
 
             endTurn() {
-                if (this.state.turn !== 'p1') return;
-                this.log("Ending turn...");
-                this.state.turn = 'p2';
+                if (this.state.turn !== this.myRole) return;
+                const player = this.myRole;
+                this.executeEndTurn(player);
+                this.sendAction({ type: 'END_TURN', player });
+            },
+
+            executeEndTurn(player) {
+                this.log(`Ending ${player === 'p1' ? 'P1' : 'P2'} turn...`);
                 
-                this.state.p1Active.forEach(f => { if (f && f.timer > 0) f.timer--; });
+                const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                activeBoard.forEach(f => { if (f && f.timer > 0) f.timer--; });
+
+                if (this.state.frozenTurns > 0) {
+                    this.state.frozenTurns--;
+                    this.log(`Next turn is frozen! Turn skipped.`);
+                    this.state.attacksRemaining = 2;
+                    activeBoard.forEach(f => { if (f) f.hasAttacked = false; });
+                } else {
+                    this.state.turn = player === 'p1' ? 'p2' : 'p1';
+                    this.state.attacksRemaining = 2;
+                    const newBoard = this.state.turn === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    newBoard.forEach(f => { if (f) f.hasAttacked = false; });
+                }
 
                 this.syncState();
                 this.updateUI();
 
-                if (!this.conn) {
+                if (!this.isOnline && this.state.turn === 'p2') {
                     setTimeout(() => this.runBotTurn(), 1200);
                 }
             },
@@ -709,12 +852,13 @@
                 }
                 const bonus = 1 + (correctCount * 0.2);
                 if (this.activePiFighter) {
-                    this.activePiFighter.atk = Math.round(this.activePiFighter.atk * bonus);
-                    this.showBanner(`📐 Mr. Brahim Pi Boost: +${correctCount * 20}% ATK!`);
+                    const player = this.myRole;
+                    const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    const idx = activeBoard.indexOf(this.activePiFighter);
+                    this.executeAbility(player, idx, bonus);
+                    this.sendAction({ type: 'ABILITY', player, index: idx, piBonus: bonus });
                 }
                 this.closeModal('piModal');
-                this.syncState();
-                this.updateUI();
             },
 
             triggerGameOver(isWin) {
@@ -735,6 +879,7 @@
             },
 
             resetToMenu() {
+                if (this.conn) this.conn.close();
                 this.closeModal('gameOverModal');
                 document.getElementById('gameScreen').classList.add('hidden');
                 document.getElementById('lobbyScreen').classList.remove('hidden');
@@ -742,16 +887,24 @@
             },
 
             updateUI() {
-                const p1Pct = (this.state.p1Hp / 3000) * 100;
-                const p2Pct = (this.state.p2Hp / 3000) * 100;
-                document.getElementById('p1HpBar').style.width = p1Pct + '%';
-                document.getElementById('p1HpText').innerText = `${this.state.p1Hp} / 3000 HP`;
-                document.getElementById('p2HpBar').style.width = p2Pct + '%';
-                document.getElementById('p2HpText').innerText = `${this.state.p2Hp} / 3000 HP`;
+                const isMyTurn = this.state.turn === this.myRole;
+                const myActive = this.myRole === 'p1' ? this.state.p1Active : this.state.p2Active;
+                const opponentActive = this.myRole === 'p1' ? this.state.p2Active : this.state.p1Active;
+                const myHand = this.myRole === 'p1' ? this.state.p1Hand : this.state.p2Hand;
+                const opponentHand = this.myRole === 'p1' ? this.state.p2Hand : this.state.p1Hand;
+                const myHp = this.myRole === 'p1' ? this.state.p1Hp : this.state.p2Hp;
+                const opponentHp = this.myRole === 'p1' ? this.state.p2Hp : this.state.p1Hp;
+
+                const myPct = (myHp / 3000) * 100;
+                const oppPct = (opponentHp / 3000) * 100;
+                document.getElementById('p1HpBar').style.width = myPct + '%';
+                document.getElementById('p1HpText').innerText = `${myHp} / 3000 HP`;
+                document.getElementById('p2HpBar').style.width = oppPct + '%';
+                document.getElementById('p2HpText').innerText = `${opponentHp} / 3000 HP`;
 
                 const turnInfo = document.getElementById('turnInfo');
                 const endBtn = document.getElementById('endTurnBtn');
-                if (this.state.turn === 'p1') {
+                if (isMyTurn) {
                     turnInfo.innerText = `YOUR TURN (${this.state.attacksRemaining} ATTACKS REMAINING)`;
                     turnInfo.style.color = 'var(--accent-green)';
                     endBtn.disabled = false;
@@ -761,27 +914,30 @@
                     endBtn.disabled = true;
                 }
 
+                const mySupports = this.myRole === 'p1' ? this.state.p1Supports : this.state.p2Supports;
+                const oppSupports = this.myRole === 'p1' ? this.state.p2Supports : this.state.p1Supports;
+
                 let p1SupHtml = '';
-                this.state.p1Supports.forEach((s, i) => {
-                    p1SupHtml += `<div class="support-card ${s.used ? 'used' : ''}" onclick="GameEngine.useSupport('p1', ${i})">${s.symbol}</div>`;
+                mySupports.forEach((s, i) => {
+                    p1SupHtml += `<div class="support-card ${s.used ? 'used' : ''}" onclick="GameEngine.useSupport('${this.myRole}', ${i})">${s.symbol}</div>`;
                 });
                 document.getElementById('p1Supports').innerHTML = p1SupHtml;
 
                 let p2SupHtml = '';
-                this.state.p2Supports.forEach((s) => {
+                oppSupports.forEach((s) => {
                     p2SupHtml += `<div class="support-card ${s.used ? 'used' : ''}">${s.used ? s.symbol : '❓'}</div>`;
                 });
                 document.getElementById('p2Supports').innerHTML = p2SupHtml;
 
-                const hasRita = this.state.p1Active.some(f => f && f.id === 'rita');
-                const hasJoumana = this.state.p1Active.some(f => f && f.id === 'joumana');
+                const hasRita = myActive.some(f => f && f.id === 'rita');
+                const hasJoumana = myActive.some(f => f && f.id === 'joumana');
                 let fusionButtonHtml = '';
                 if (hasRita && hasJoumana) {
                     fusionButtonHtml = `<div style="grid-column: span 3; text-align: center; margin-bottom: 4px;"><button class="btn btn-fusion" style="width:100%; padding: 10px; font-size: 13px;" onclick="GameEngine.triggerNightmareFusion()">✨ FUSE NIGHTMARE DUO (Rita + Joumana) 🔥</button></div>`;
                 }
 
                 let p1BoardHtml = fusionButtonHtml;
-                this.state.p1Active.forEach((f, i) => {
+                myActive.forEach((f, i) => {
                     if (f) {
                         const isReady = f.timer === 0;
                         p1BoardHtml += `
@@ -803,7 +959,7 @@
                 document.getElementById('p1ActiveBoard').innerHTML = p1BoardHtml;
 
                 let p2BoardHtml = '';
-                this.state.p2Active.forEach((f) => {
+                opponentActive.forEach((f) => {
                     if (f) {
                         p2BoardHtml += `
                             <div class="fighter-card">
@@ -819,10 +975,10 @@
                     }
                 });
                 document.getElementById('p2ActiveBoard').innerHTML = p2BoardHtml;
-                document.getElementById('p2HandCount').innerText = `Reserve: ${this.state.p2Hand.length} Cards`;
+                document.getElementById('p2HandCount').innerText = `Reserve: ${opponentHand.length} Cards`;
 
                 let handHtml = '';
-                this.state.p1Hand.forEach((f, i) => {
+                myHand.forEach((f, i) => {
                     handHtml += `
                         <div class="fighter-card" style="min-width: 130px; cursor: pointer;" onclick="GameEngine.deployFighter(${i})">
                             <div>
