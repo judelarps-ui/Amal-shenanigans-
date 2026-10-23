@@ -833,7 +833,8 @@
                 if (!fighter) return false;
                 
                 fighter.hasAttacked = false;
-                fighter.timer = 0; // Freshly deployed, ready to use ability
+                // Newly deployed cards start on cooldown so abilities aren't available instantly on deployment
+                fighter.timer = fighter.cooldown;
                 activeBoard[emptySlot] = fighter;
 
                 this.log(`${player === 'p1' ? 'P1' : 'P2'} deployed ${fighter.name}!`);
@@ -891,6 +892,9 @@
                 const f = activeBoard[index];
                 if (!f || f.timer > 0) return;
 
+                // Immediately set the cooldown on trigger to prevent multi-activations
+                f.timer = f.cooldown;
+
                 if (f.id === 'brahim') {
                     this.activePiFighter = f;
                     this.openModal('piModal');
@@ -908,7 +912,7 @@
                 const f = activeBoard[index];
                 if (!f) return false;
 
-                // Set timer to card's specific cooldown
+                // Ensure the timer is locked to the card's cooldown
                 f.timer = f.cooldown;
 
                 if (f.id === 'nightmare_duo') {
