@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
     <title>Amal Shenanigans</title>
     <!-- PeerJS for P2P multiplayer -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -24,18 +24,34 @@
             --text-muted: #9ca3af;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: var(--bg-dark);
             color: var(--text-main);
             padding: 12px;
             min-height: 100vh;
+            min-height: -webkit-fill-available;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        /* iOS Full Height Fix */
+        html {
+            height: -webkit-fill-available;
         }
 
         /* Screen Shake Animation */
@@ -87,6 +103,7 @@
             position: relative;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
+            -webkit-transform: translateZ(0);
         }
         .vertical-card:hover { transform: translateY(-3px); }
 
@@ -118,7 +135,7 @@
         .support-card:hover:not(.used) { transform: translateY(-2px); box-shadow: 0 0 10px #ec4899; }
         .support-card.used { background: #1f2937; border-color: #374151; color: #4b5563; cursor: default; }
 
-        .btn { background: var(--primary); color: #fff; border: none; padding: 10px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
+        .btn { background: var(--primary); color: #fff; border: none; padding: 10px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; -webkit-appearance: none; }
         .btn:hover:not(:disabled) { background: var(--primary-hover); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-green { background: var(--accent-green); }
@@ -129,10 +146,10 @@
 
         .banner-text { background: #1e1b4b; border: 1px solid #6366f1; color: #f59e0b; padding: 8px; border-radius: 8px; font-size: 11px; font-weight: bold; text-align: center; }
 
-        .log-box { background: #080b12; border: 1px solid #1a2336; border-radius: 8px; padding: 8px; height: 80px; overflow-y: auto; font-family: monospace; font-size: 10px; color: #a1a1aa; display: flex; flex-direction: column; gap: 2px; }
+        .log-box { background: #080b12; border: 1px solid #1a2336; border-radius: 8px; padding: 8px; height: 80px; overflow-y: auto; font-family: monospace; font-size: 10px; color: #a1a1aa; display: flex; flex-direction: column; gap: 2px; -webkit-overflow-scrolling: touch; }
 
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
-        .modal-content { background: var(--panel-bg); border: 1px solid var(--panel-border); padding: 20px; border-radius: 16px; max-width: 400px; width: 100%; max-height: 85vh; overflow-y: auto; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+        .modal-content { background: var(--panel-bg); border: 1px solid var(--panel-border); padding: 20px; border-radius: 16px; max-width: 400px; width: 100%; max-height: 85vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .hidden { display: none !important; }
 
         .rules-item { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--panel-border); }
@@ -310,7 +327,7 @@
                     <span style="font-size: 11px; font-weight: 800; color: #f3f4f6;">🖐️ Reserve Hand (Tap card to deploy)</span>
                     <span id="sTierChanceLabel" style="font-size: 10px; font-weight: 900; color: #f59e0b;">9% S-TIER CHANCE</span>
                 </div>
-                <div id="p1HandBoard" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;"></div>
+                <div id="p1HandBoard" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch;"></div>
             </div>
 
         </div>
@@ -338,7 +355,7 @@
         <div class="modal-content" style="text-align: center;">
             <h3 style="color: var(--accent-gold); margin-bottom: 6px;">📐 Mr. Brahim's Pi Recitation!</h3>
             <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">Type correct digits after "3." (e.g., 14159...). Each correct digit adds +20% ATK!</p>
-            <input type="text" id="piInput" placeholder="14159..." style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #374151; background: #080b12; color: #fff; font-size: 14px; font-family: monospace; text-align: center; margin-bottom: 12px;">
+            <input type="text" id="piInput" placeholder="14159..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #374151; background: #080b12; color: #fff; font-size: 14px; font-family: monospace; text-align: center; margin-bottom: 12px; -webkit-appearance: none;">
             <button class="btn btn-green" onclick="GameEngine.submitPi()">Declare Pi Digits</button>
         </div>
     </div>
@@ -350,7 +367,7 @@
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <button class="btn btn-green" style="padding:10px;" onclick="GameEngine.hostOnlineRoom()">Host New Room</button>
                 <div style="display: flex; gap: 6px; margin-top: 6px;">
-                    <input type="text" id="peerCodeInput" maxlength="4" placeholder="4-Digit Code" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid #374151; background: #080b12; color: #fff; font-size: 14px; text-align: center; outline: none; font-weight: bold; letter-spacing: 2px;">
+                    <input type="text" id="peerCodeInput" maxlength="4" placeholder="4-Digit Code" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid #374151; background: #080b12; color: #fff; font-size: 14px; text-align: center; outline: none; font-weight: bold; letter-spacing: 2px; -webkit-appearance: none;">
                     <button class="btn btn-blue" style="width: auto; padding: 0 16px;" onclick="GameEngine.joinOnlineRoom()">Join</button>
                 </div>
             </div>
@@ -409,9 +426,18 @@
     </div>
 
     <script>
+        // iOS WebAudio Unlock helper
         const SoundFX = {
             ctx: null,
-            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
             play(type) {
                 try {
                     this.init();
@@ -447,6 +473,12 @@
                 } catch(e) {}
             }
         };
+
+        // Unlock audio on first touch for iOS WebKit
+        window.addEventListener('touchstart', function unlockAudio() {
+            SoundFX.init();
+            window.removeEventListener('touchstart', unlockAudio);
+        }, { passive: true, once: true });
 
         const FIGHTER_ROSTER = [
             { id: 'ghizel', name: 'Miss Ghizel', tier: 'S', hp: 1000, maxHp: 1000, atk: 1000, cooldown: 3, timer: 3, icon: '👑', desc: 'Principal Decree: Heals 25% max HP & 3x DMG for 1 turn.' },
@@ -544,7 +576,22 @@
                             { urls: 'stun:stun1.l.google.com:19302' },
                             { urls: 'stun:stun2.l.google.com:19302' },
                             { urls: 'stun:stun3.l.google.com:19302' },
-                            { urls: 'stun:stun4.l.google.com:19302' }
+                            { urls: 'stun:stun4.l.google.com:19302' },
+                            {
+                                urls: 'turn:openrelay.metered.ca:80',
+                                username: 'openrelay',
+                                credential: 'openrelay'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443',
+                                username: 'openrelay',
+                                credential: 'openrelay'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                                username: 'openrelay',
+                                credential: 'openrelay'
+                            }
                         ]
                     },
                     debug: 1
@@ -588,7 +635,7 @@
                             alert("Code collision, retrying with new code...");
                             this.hostOnlineRoom();
                         } else {
-                            alert("Room Creation Error: " + err.type);
+                            alert("Room Creation Error: " + err.type + "\nRetrying server connection...");
                         }
                     });
                 } catch(e) {
@@ -596,7 +643,7 @@
                 }
             },
 
-            joinOnlineRoom() {
+            joinOnlineRoom(retryCount = 0) {
                 const code = document.getElementById('peerCodeInput').value.trim();
                 if (!code || code.length !== 4) { alert("Please enter a valid 4-digit room code."); return; }
                 const targetPeerId = 'amal-room-' + code;
@@ -606,12 +653,18 @@
                     this.peer = new Peer(this.getPeerConfig());
 
                     this.peer.on('open', () => {
-                        this.conn = this.peer.connect(targetPeerId, { reliable: true });
+                        this.conn = this.peer.connect(targetPeerId, { 
+                            reliable: true,
+                            serialization: 'json'
+                        });
                         this.isHost = false;
                         this.isOnline = true;
                         this.myRole = 'p2';
 
+                        let connected = false;
+
                         this.conn.on('open', () => {
+                            connected = true;
                             alert("Successfully joined room " + code + "!");
                             document.getElementById('roomModal').classList.add('hidden');
                             document.getElementById('lobbyScreen').classList.add('hidden');
@@ -621,13 +674,23 @@
                             this.setupPeerListeners();
                         });
 
+                        setTimeout(() => {
+                            if (!connected && retryCount < 2) {
+                                this.joinOnlineRoom(retryCount + 1);
+                            }
+                        }, 5000);
+
                         this.conn.on('error', (err) => {
                             alert("Connection Error: " + err);
                         });
                     });
 
                     this.peer.on('error', (err) => {
-                        alert("Peer Error: " + err.type);
+                        if (retryCount < 2) {
+                            setTimeout(() => this.joinOnlineRoom(retryCount + 1), 1000);
+                        } else {
+                            alert("Peer Error: " + err.type + "\nPlease verify the code or check internet connection.");
+                        }
                     });
                 } catch(e) {
                     alert("Failed to join room: " + e.message);
@@ -681,7 +744,6 @@
             draftCards(forTarget = 'p1') {
                 const pool = [...FIGHTER_ROSTER];
                 const drafted = [];
-                // S-Tier chance set to 9% across all human players and bot match
                 const sTierThreshold = 0.09;
 
                 for (let i = 0; i < 5; i++) {
@@ -928,7 +990,6 @@
                 const attacker = attackerBoard[attackerIdx];
                 if (!attacker || attacker.hasAttacked) return;
 
-                // Check Evade Support status on defender side
                 const isDefenderP1 = (player === 'p2');
                 const hasEvade = isDefenderP1 ? this.state.p1Evade : this.state.p2Evade;
 
