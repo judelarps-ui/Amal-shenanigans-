@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
     <title>Amal Shenanigans</title>
-    <!-- PeerJS for P2P multiplayer -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- MQTT/WebSocket Public Relay Client for maximum iOS WebKit compatibility without PeerJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         :root {
             --bg-dark: #0b0f19;
@@ -49,12 +49,10 @@
             touch-action: manipulation;
         }
 
-        /* iOS Full Height Fix */
         html {
             height: -webkit-fill-available;
         }
 
-        /* Screen Shake Animation */
         .shake-impact {
             animation: shake 0.35s cubic-bezier(.36,.07,.19,.97) both;
         }
@@ -123,7 +121,6 @@
         .card-tier-tag.D { color: #9ca3af; }
         .card-tier-tag.FUSION { color: #f87171; }
 
-        .card-atk-tag { color: #f3f4f6; font-size: 10px; font-weight: 800; }
         .card-title-main { font-size: 12px; font-weight: 800; color: #fff; margin: auto 0; line-height: 1.2; }
         .card-hp-footer { font-size: 10px; font-weight: 700; color: #9ca3af; }
         .cooldown-badge { font-size: 9px; font-weight: 800; color: #ef4444; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 1px 4px; margin-top: 2px; }
@@ -158,7 +155,6 @@
         .rules-item p, .rules-item li { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
         .rules-item ul { padding-left: 16px; margin-top: 4px; }
 
-        /* CUTSCENE OVERLAY SYSTEM */
         #cutsceneOverlay {
             position: fixed;
             inset: 0;
@@ -172,80 +168,24 @@
             pointer-events: none;
             transition: opacity 0.3s ease;
         }
-        #cutsceneOverlay.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .cutscene-title {
-            font-size: 26px;
-            font-weight: 900;
-            color: #f59e0b;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            text-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
-            animation: zoomIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .cutscene-subtitle {
-            font-size: 14px;
-            color: #e2e8f0;
-            margin-top: 10px;
-            font-weight: 700;
-            animation: fadeInUp 0.5s ease;
-        }
-        .cutscene-icon {
-            font-size: 64px;
-            margin-bottom: 16px;
-            animation: pulseGlow 1s infinite alternate;
-        }
+        #cutsceneOverlay.active { opacity: 1; pointer-events: auto; }
+        .cutscene-title { font-size: 26px; font-weight: 900; color: #f59e0b; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 20px rgba(245, 158, 11, 0.8); animation: zoomIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .cutscene-subtitle { font-size: 14px; color: #e2e8f0; margin-top: 10px; font-weight: 700; animation: fadeInUp 0.5s ease; }
+        .cutscene-icon { font-size: 64px; margin-bottom: 16px; animation: pulseGlow 1s infinite alternate; }
 
-        /* FLOATING TEXT ANIMATIONS */
-        .floating-text {
-            position: absolute;
-            font-weight: 900;
-            font-size: 18px;
-            pointer-events: none;
-            z-index: 50;
-            animation: floatUp 1s ease-out forwards;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-        }
-        @keyframes floatUp {
-            0% { opacity: 1; transform: translateY(0) scale(1); }
-            100% { opacity: 0; transform: translateY(-40px) scale(1.3); }
-        }
+        .floating-text { position: absolute; font-weight: 900; font-size: 18px; pointer-events: none; z-index: 50; animation: floatUp 1s ease-out forwards; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-40px) scale(1.3); } }
 
-        /* SLASH EFFECT */
-        .slash-effect {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            background: linear-gradient(135deg, transparent 45%, rgba(239, 68, 68, 0.8) 50%, transparent 55%);
-            animation: slashAnim 0.3s ease-out forwards;
-            z-index: 40;
-            border-radius: 12px;
-        }
-        @keyframes slashAnim {
-            0% { opacity: 0; transform: scale(0.8); }
-            50% { opacity: 1; }
-            100% { opacity: 0; transform: scale(1.1); }
-        }
+        .slash-effect { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(135deg, transparent 45%, rgba(239, 68, 68, 0.8) 50%, transparent 55%); animation: slashAnim 0.3s ease-out forwards; z-index: 40; border-radius: 12px; }
+        @keyframes slashAnim { 0% { opacity: 0; transform: scale(0.8); } 50% { opacity: 1; } 100% { opacity: 0; transform: scale(1.1); } }
 
-        @keyframes zoomIn {
-            from { transform: scale(0.3); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-        @keyframes fadeInUp {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes pulseGlow {
-            from { transform: scale(0.95); filter: drop-shadow(0 0 10px rgba(236,72,153,0.5)); }
-            to { transform: scale(1.1); filter: drop-shadow(0 0 25px rgba(236,72,153,0.9)); }
-        }
+        @keyframes zoomIn { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes fadeInUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes pulseGlow { from { transform: scale(0.95); filter: drop-shadow(0 0 10px rgba(236,72,153,0.5)); } to { transform: scale(1.1); filter: drop-shadow(0 0 25px rgba(236,72,153,0.9)); } }
     </style>
 </head>
 <body>
 
-    <!-- CUTSCENE OVERLAY -->
     <div id="cutsceneOverlay">
         <div id="cutsceneIcon" class="cutscene-icon">🔮</div>
         <div id="cutsceneTitle" class="cutscene-title">SPECIAL ABILITY</div>
@@ -253,7 +193,6 @@
     </div>
 
     <div class="container" id="mainAppContainer">
-        <!-- Main Header -->
         <div class="panel header">
             <div>
                 <h1 style="font-size: 20px; color: var(--primary); font-weight: 900;">AMAL SHENANIGANS</h1>
@@ -262,22 +201,18 @@
             <div id="statusBadge" style="font-size: 10px; color: var(--accent-gold); font-weight: bold; background: #1c2536; padding: 4px 10px; border-radius: 6px; border: 1px solid #2e3a54;">Main Menu</div>
         </div>
 
-        <!-- MAIN MENU PANEL -->
         <div id="lobbyScreen" class="panel" style="text-align: center; padding: 28px 16px;">
             <h2 style="font-size: 18px; margin-bottom: 6px;">Welcome to the Arena</h2>
             <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 20px;">Select game mode to battle!</p>
             
             <div style="display: flex; flex-direction: column; gap: 10px; max-width: 280px; margin: 0 auto;">
                 <button class="btn btn-green" onclick="GameEngine.startVsAI()">⚔️ Play Vs AI Bot</button>
-                <button class="btn btn-blue" onclick="GameEngine.openModal('roomModal')">🌐 Online Multiplayer Room</button>
+                <button class="btn btn-blue" onclick="GameEngine.openModal('roomModal')">🌐 Online Room (iOS Ready)</button>
                 <button class="btn btn-dark" onclick="GameEngine.openModal('rulesModal')">📖 Rules & Guide</button>
             </div>
         </div>
 
-        <!-- BATTLE SCREEN -->
         <div id="gameScreen" class="hidden" style="display: flex; flex-direction: column; gap: 10px;">
-            
-            <!-- OPPONENT FIELD -->
             <div class="panel" id="opponentPanel">
                 <div class="player-row">
                     <span id="p2NameLabel" style="color: #f3f4f6;">👤 Opponent</span>
@@ -290,14 +225,12 @@
                 <div id="p2ActiveBoard" class="card-grid"></div>
             </div>
 
-            <!-- TURN BANNER & NOTIFICATIONS -->
             <div class="banner-text" id="turnBannerText">
                 Match Started! Tap cards from your hand to deploy.
             </div>
 
             <div id="abilityBanner" class="banner-text hidden" style="color: #4ade80; border-color: #22c55e;"></div>
 
-            <!-- PLAYER FIELD -->
             <div class="panel" id="playerPanel" style="box-shadow: 0 0 16px rgba(245, 158, 11, 0.15);">
                 <div id="p1ActiveBoard" class="card-grid" style="margin-bottom: 12px;"></div>
 
@@ -310,19 +243,16 @@
                 </div>
             </div>
 
-            <!-- CONTROLS & SUPPORT TRAPS -->
             <div class="panel" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; gap: 8px;">
                 <button id="endTurnBtn" class="btn btn-green" style="width: auto; padding: 6px 14px;" onclick="GameEngine.endTurn()">End Turn</button>
                 <button id="fusionBtn" class="btn btn-fusion" style="width: auto; padding: 6px 12px; font-size: 11px; display: none;" onclick="GameEngine.triggerNightmareFusion()">🔮 Fuse Duo</button>
                 <div id="p1Supports" class="support-row"></div>
             </div>
 
-            <!-- LOG BOX -->
             <div class="panel" style="padding: 8px;">
                 <div id="logBox" class="log-box"></div>
             </div>
 
-            <!-- RESERVE HAND -->
             <div class="panel">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <span style="font-size: 11px; font-weight: 800; color: #f3f4f6;">🖐️ Reserve Hand (Tap card to deploy)</span>
@@ -330,7 +260,6 @@
                 </div>
                 <div id="p1HandBoard" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch;"></div>
             </div>
-
         </div>
     </div>
 
@@ -376,7 +305,6 @@
         </div>
     </div>
 
-    <!-- FULL CHARACTER & RULES GUIDE MODAL -->
     <div id="rulesModal" class="modal hidden">
         <div class="modal-content">
             <h3 style="margin-bottom: 12px; color: var(--primary); text-align: center;">📖 Game Guide & All Character Abilities</h3>
@@ -427,7 +355,6 @@
     </div>
 
     <script>
-        // iOS WebAudio Unlock helper
         const SoundFX = {
             ctx: null,
             init() {
@@ -475,7 +402,6 @@
             }
         };
 
-        // Unlock audio on first touch for iOS WebKit
         window.addEventListener('touchstart', function unlockAudio() {
             SoundFX.init();
             window.removeEventListener('touchstart', unlockAudio);
@@ -502,6 +428,54 @@
             { id: 'bell', symbol: '🔔', name: 'School Bell' }
         ];
 
+        const MQTTRelay = {
+            client: null,
+            roomCode: null,
+            clientId: 'amal_' + Math.random().toString(36).substr(2, 8),
+
+            connect(roomCode, onMessage, onConnected) {
+                this.roomCode = roomCode;
+                this.client = new Paho.MQTT.Client('broker.hivemq.com', 8000, this.clientId);
+                
+                this.client.onConnectionLost = (response) => {
+                    console.log('Connection lost:', response.errorMessage);
+                };
+
+                this.client.onMessageArrived = (message) => {
+                    try {
+                        const payload = JSON.parse(message.payloadString);
+                        if (payload.sender !== this.clientId) {
+                            onMessage(payload.data);
+                        }
+                    } catch(e) {}
+                };
+
+                this.client.connect({
+                    onSuccess: () => {
+                        this.client.subscribe('amal_game_room_' + roomCode);
+                        if (onConnected) onConnected();
+                    },
+                    useSSL: false,
+                    cleanSession: true,
+                    keepAliveInterval: 30
+                });
+            },
+
+            send(data) {
+                if (this.client && this.client.isConnected()) {
+                    const msg = new Paho.MQTT.Message(JSON.stringify({ sender: this.clientId, data }));
+                    msg.destinationName = 'amal_game_room_' + this.roomCode;
+                    this.client.send(msg);
+                }
+            },
+
+            disconnect() {
+                if (this.client && this.client.isConnected()) {
+                    try { this.client.disconnect(); } catch(e){}
+                }
+            }
+        };
+
         const GameEngine = {
             state: {
                 p1Hp: 3000, p2Hp: 3000,
@@ -512,13 +486,12 @@
                 turn: 'p1', attacksRemaining: 2, frozenTurns: 0, stats: { damageDealt: 0, turns: 0 }
             },
             myRole: 'p1',
-            selectedFighterIndex: null, pendingAttackSlot: null, activePiFighter: null,
-            peer: null, conn: null, isHost: false, isOnline: false,
+            selectedFighterIndex: null, pendingAttackSlot: null, activePiFighter: null, pendingSupportIdx: null,
+            isHost: false, isOnline: false,
 
             openModal(id) { document.getElementById(id).classList.remove('hidden'); },
             closeModal(id) { document.getElementById(id).classList.add('hidden'); },
 
-            /* Visual Cutscenes & FX */
             playCutscene(icon, title, sub, duration = 1500) {
                 SoundFX.play('cutscene');
                 const overlay = document.getElementById('cutsceneOverlay');
@@ -526,37 +499,13 @@
                 document.getElementById('cutsceneTitle').innerText = title;
                 document.getElementById('cutsceneSub').innerText = sub;
                 overlay.classList.add('active');
-                setTimeout(() => {
-                    overlay.classList.remove('active');
-                }, duration);
+                setTimeout(() => { overlay.classList.remove('active'); }, duration);
             },
 
             triggerScreenShake() {
                 const container = document.getElementById('mainAppContainer');
                 container.classList.add('shake-impact');
                 setTimeout(() => container.classList.remove('shake-impact'), 350);
-            },
-
-            spawnFloatingText(elementId, text, color = '#ef4444') {
-                const targetEl = document.getElementById(elementId);
-                if (!targetEl) return;
-                const rect = targetEl.getBoundingClientRect();
-                const floatEl = document.createElement('div');
-                floatEl.className = 'floating-text';
-                floatEl.innerText = text;
-                floatEl.style.color = color;
-                floatEl.style.left = (rect.left + rect.width / 2 - 20) + 'px';
-                floatEl.style.top = (rect.top + rect.height / 2) + 'px';
-                document.body.appendChild(floatEl);
-                setTimeout(() => floatEl.remove(), 1000);
-            },
-
-            spawnSlashEffect(cardElement) {
-                if (!cardElement) return;
-                const slash = document.createElement('div');
-                slash.className = 'slash-effect';
-                cardElement.appendChild(slash);
-                setTimeout(() => slash.remove(), 300);
             },
 
             startVsAI() {
@@ -569,207 +518,84 @@
                 this.initMatch();
             },
 
-            getPeerConfig() {
-                return {
-                    config: {
-                        iceServers: [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' },
-                            { urls: 'stun:stun2.l.google.com:19302' },
-                            { urls: 'stun:stun3.l.google.com:19302' },
-                            { urls: 'stun:stun4.l.google.com:19302' },
-                            { urls: 'stun:global.stun.twilio.com:3478' }
-                        ],
-                        iceCandidatePoolSize: 10
-                    },
-                    debug: 1
-                };
-            },
-
             hostOnlineRoom() {
-                try {
-                    const fourDigitCode = Math.floor(1000 + Math.random() * 9000).toString();
-                    const fullPeerId = 'amal-room-' + fourDigitCode;
+                const code = Math.floor(1000 + Math.random() * 9000).toString();
+                document.getElementById('peerCodeInput').value = code;
 
-                    if (this.peer) {
-                        try { this.peer.destroy(); } catch(e){}
-                        this.peer = null;
-                    }
-                    this.peer = new Peer(fullPeerId, this.getPeerConfig());
-
-                    this.peer.on('open', () => {
-                        const codeInput = document.getElementById('peerCodeInput');
-                        if (codeInput) codeInput.value = fourDigitCode;
-                        alert("Room Created!\n\nYour 4-Digit Room Code: " + fourDigitCode);
-                        document.getElementById('roomModal').classList.add('hidden');
-                        document.getElementById('lobbyScreen').classList.add('hidden');
-                        document.getElementById('gameScreen').classList.remove('hidden');
-                        document.getElementById('statusBadge').innerText = "Host Code: " + fourDigitCode;
-                        document.getElementById('p2NameLabel').innerText = "Waiting for Player 2...";
+                MQTTRelay.connect(code, 
+                    (data) => this.handleNetworkData(data),
+                    () => {
                         this.isHost = true;
                         this.isOnline = true;
                         this.myRole = 'p1';
                         this.initMatch();
-                    });
-
-                    this.peer.on('connection', (connection) => {
-                        this.conn = connection;
-                        this.setupPeerListeners();
-                        document.getElementById('statusBadge').innerText = "Online Connected!";
-                        document.getElementById('p2NameLabel').innerText = "Player 2 (Online)";
-                        this.log("Player 2 connected!");
-                        setTimeout(() => this.syncState(), 500);
-                    });
-
-                    this.peer.on('error', (err) => {
-                        console.warn("Peer Host Error: ", err);
-                        if (err.type === 'unavailable-id') {
-                            this.hostOnlineRoom();
-                        }
-                    });
-                } catch(e) {
-                    alert("Failed to create room: " + e.message);
-                }
+                        document.getElementById('roomModal').classList.add('hidden');
+                        document.getElementById('lobbyScreen').classList.add('hidden');
+                        document.getElementById('gameScreen').classList.remove('hidden');
+                        document.getElementById('statusBadge').innerText = "Room Code: " + code;
+                        document.getElementById('p2NameLabel').innerText = "Waiting for Player 2...";
+                        alert("Room created! Share Code: " + code);
+                    }
+                );
             },
 
             joinOnlineRoom() {
-                const codeInput = document.getElementById('peerCodeInput');
-                const code = codeInput ? codeInput.value.trim() : '';
-                if (!code || code.length !== 4) { alert("Please enter a valid 4-digit room code."); return; }
-                const targetPeerId = 'amal-room-' + code;
+                const code = document.getElementById('peerCodeInput').value.trim();
+                if (code.length !== 4) { alert("Enter 4-digit code!"); return; }
 
-                const joinBtn = document.getElementById('joinRoomBtn');
-                if (joinBtn) {
-                    joinBtn.disabled = true;
-                    joinBtn.innerText = "Connecting...";
-                }
-
-                try {
-                    if (this.peer) {
-                        try { this.peer.destroy(); } catch(e){}
-                        this.peer = null;
-                    }
-                    this.peer = new Peer(this.getPeerConfig());
-
-                    let timeoutTimer = setTimeout(() => {
-                        if (joinBtn) {
-                            joinBtn.disabled = false;
-                            joinBtn.innerText = "Join";
-                        }
-                        alert("Connection timed out. Make sure the host has the room open and active on screen.");
-                    }, 18000);
-
-                    this.peer.on('open', () => {
-                        const conn = this.peer.connect(targetPeerId, { 
-                            reliable: true
-                        });
-                        this.conn = conn;
+                MQTTRelay.connect(code, 
+                    (data) => this.handleNetworkData(data),
+                    () => {
                         this.isHost = false;
                         this.isOnline = true;
                         this.myRole = 'p2';
-
-                        this.setupPeerListeners();
-
-                        this.conn.on('open', () => {
-                            clearTimeout(timeoutTimer);
-                            if (joinBtn) {
-                                joinBtn.disabled = false;
-                                joinBtn.innerText = "Join";
-                            }
-                            document.getElementById('roomModal').classList.add('hidden');
-                            document.getElementById('lobbyScreen').classList.add('hidden');
-                            document.getElementById('gameScreen').classList.remove('hidden');
-                            document.getElementById('statusBadge').innerText = "Online Connected!";
-                            document.getElementById('p2NameLabel').innerText = "Host (Player 1)";
-                        });
-
-                        this.conn.on('error', (err) => {
-                            clearTimeout(timeoutTimer);
-                            if (joinBtn) {
-                                joinBtn.disabled = false;
-                                joinBtn.innerText = "Join";
-                            }
-                            alert("Connection error: " + (err.message || err.type));
-                        });
-                    });
-
-                    this.peer.on('error', (err) => {
-                        clearTimeout(timeoutTimer);
-                        if (joinBtn) {
-                            joinBtn.disabled = false;
-                            joinBtn.innerText = "Join";
-                        }
-                        alert("Peer Error: Could not find room " + code + ". Make sure host room is active.");
-                    });
-                } catch(e) {
-                    if (joinBtn) {
-                        joinBtn.disabled = false;
-                        joinBtn.innerText = "Join";
+                        document.getElementById('roomModal').classList.add('hidden');
+                        document.getElementById('lobbyScreen').classList.add('hidden');
+                        document.getElementById('gameScreen').classList.remove('hidden');
+                        document.getElementById('statusBadge').innerText = "Joined Room: " + code;
+                        document.getElementById('p2NameLabel').innerText = "Player 1 (Host)";
+                        MQTTRelay.send({ type: 'JOINED' });
                     }
-                    alert("Failed to join room: " + e.message);
-                }
+                );
             },
 
-            setupPeerListeners() {
-                if (!this.conn) return;
-                this.conn.on('data', (data) => {
-                    if (data.type === 'SYNC_STATE') {
-                        this.state = data.state;
-                        this.updateUI();
-                    } else if (data.type === 'ACTION') {
-                        this.handleRemoteAction(data.action);
-                    }
-                });
-                this.conn.on('close', () => {
-                    alert("Opponent disconnected!");
-                    this.resetToMenu();
-                });
+            handleNetworkData(data) {
+                if (data.type === 'JOINED' && this.isHost) {
+                    this.log("Player 2 connected!");
+                    document.getElementById('p2NameLabel').innerText = "Player 2 (Online)";
+                    this.syncState();
+                } else if (data.type === 'SYNC_STATE') {
+                    this.state = data.state;
+                    this.updateUI();
+                } else if (data.type === 'ACTION') {
+                    this.handleRemoteAction(data.action);
+                }
             },
 
             syncState() {
-                if (this.conn && this.conn.open) {
-                    this.conn.send({ type: 'SYNC_STATE', state: this.state });
-                }
+                if (this.isOnline) MQTTRelay.send({ type: 'SYNC_STATE', state: this.state });
             },
 
             sendAction(action) {
-                if (this.isOnline && this.conn && this.conn.open) {
-                    this.conn.send({ type: 'ACTION', action: action });
-                }
+                if (this.isOnline) MQTTRelay.send({ type: 'ACTION', action });
             },
 
             handleRemoteAction(action) {
-                if (action.type === 'DEPLOY') {
-                    this.executeDeploy(action.player, action.index);
-                } else if (action.type === 'ATTACK') {
-                    this.executeAttackLogic(action.attackerIdx, action.targetType, action.targetIdx, action.player);
-                } else if (action.type === 'END_TURN') {
-                    this.executeEndTurn(action.player);
-                } else if (action.type === 'FUSION') {
-                    this.executeNightmareFusion(action.player);
-                } else if (action.type === 'ABILITY') {
-                    this.executeAbility(action.player, action.index, action.piBonus);
-                } else if (action.type === 'SUPPORT') {
-                    this.executeSupport(action.player, action.index, action.targetType, action.targetIdx);
-                }
+                if (action.type === 'DEPLOY') this.executeDeploy(action.player, action.index);
+                else if (action.type === 'ATTACK') this.executeAttackLogic(action.attackerIdx, action.targetType, action.targetIdx, action.player);
+                else if (action.type === 'END_TURN') this.executeEndTurn(action.player);
+                else if (action.type === 'FUSION') this.executeNightmareFusion(action.player);
+                else if (action.type === 'ABILITY') this.executeAbility(action.player, action.index, action.piBonus);
+                else if (action.type === 'SUPPORT') this.executeSupport(action.player, action.index, action.targetType, action.targetIdx);
             },
 
             draftCards(forTarget = 'p1') {
                 const pool = [...FIGHTER_ROSTER];
                 const drafted = [];
-                // Decreased S-Tier chance from 9% to 6%
-                const sTierThreshold = 0.06;
-
                 for (let i = 0; i < 5; i++) {
                     const rand = Math.random();
-                    let available = pool;
-                    if (rand < sTierThreshold) {
-                        const sTier = pool.filter(f => f.tier === 'S');
-                        if (sTier.length > 0) available = sTier;
-                    } else {
-                        // Exclude S-Tier if roll failed
-                        available = pool.filter(f => f.tier !== 'S');
-                    }
+                    let available = (rand < 0.06) ? pool.filter(f => f.tier === 'S') : pool.filter(f => f.tier !== 'S');
+                    if (available.length === 0) available = pool;
                     const idx = Math.floor(Math.random() * available.length);
                     drafted.push({ ...available[idx], timer: 0, uniqueId: Math.random().toString(36).substr(2, 9) });
                 }
@@ -777,8 +603,7 @@
             },
 
             draftSupports() {
-                const shuffled = [...SUPPORT_TYPES].sort(() => 0.5 - Math.random());
-                return shuffled.slice(0, 3).map(s => ({ ...s, used: false, uniqueId: Math.random().toString(36).substr(2, 9) }));
+                return [...SUPPORT_TYPES].sort(() => 0.5 - Math.random()).slice(0, 3).map(s => ({ ...s, used: false, uniqueId: Math.random().toString(36).substr(2, 9) }));
             },
 
             initMatch() {
@@ -790,7 +615,7 @@
                     p1Evade: false, p2Evade: false,
                     turn: 'p1', attacksRemaining: 2, frozenTurns: 0, stats: { damageDealt: 0, turns: 1 }
                 };
-                this.log(`Match started! 6% S-Tier drop rate active.`);
+                this.log(`Match started! Support system online.`);
                 this.syncState();
                 this.updateUI();
             },
@@ -824,19 +649,12 @@
                 const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
                 const handBoard = player === 'p1' ? this.state.p1Hand : this.state.p2Hand;
                 const emptySlot = activeBoard.indexOf(null);
-                
-                if (emptySlot === -1) { 
-                    if (player === this.myRole) alert("All 3 active slots are full!"); 
-                    return false; 
-                }
+                if (emptySlot === -1) return false;
                 const fighter = handBoard.splice(index, 1)[0];
                 if (!fighter) return false;
-                
                 fighter.hasAttacked = false;
-                // Newly deployed cards start on cooldown so abilities aren't available instantly on deployment
                 fighter.timer = fighter.cooldown;
                 activeBoard[emptySlot] = fighter;
-
                 this.log(`${player === 'p1' ? 'P1' : 'P2'} deployed ${fighter.name}!`);
                 this.syncState();
                 this.updateUI();
@@ -846,40 +664,20 @@
             triggerNightmareFusion() {
                 if (this.state.turn !== this.myRole) return;
                 const player = this.myRole;
-                if (this.executeNightmareFusion(player)) {
-                    this.sendAction({ type: 'FUSION', player });
-                }
+                if (this.executeNightmareFusion(player)) this.sendAction({ type: 'FUSION', player });
             },
 
             executeNightmareFusion(player) {
                 const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
                 const ritaIdx = activeBoard.findIndex(f => f && f.id === 'rita');
                 const joumanaIdx = activeBoard.findIndex(f => f && f.id === 'joumana');
-                
-                if (ritaIdx === -1 || joumanaIdx === -1) {
-                    if (player === this.myRole) alert("You need both Miss Rita and Miss Joumana active on your board!");
-                    return false;
-                }
+                if (ritaIdx === -1 || joumanaIdx === -1) return false;
 
-                this.playCutscene('🔮', 'NIGHTMARE DUO FUSION', 'Miss Rita & Miss Joumana merged into ultimate entity!');
-
-                const fusionFighter = {
-                    id: 'nightmare_duo',
-                    name: 'Nightmare Duo',
-                    tier: 'FUSION',
-                    hp: 2000,
-                    maxHp: 2000,
-                    atk: 900,
-                    cooldown: 1,
-                    timer: 0,
-                    icon: '🔮',
-                    hasAttacked: false,
-                    desc: 'Merged Fusion entity.'
+                this.playCutscene('🔮', 'NIGHTMARE DUO FUSION', 'Fusion entity summoned!');
+                activeBoard[ritaIdx] = {
+                    id: 'nightmare_duo', name: 'Nightmare Duo', tier: 'FUSION', hp: 2000, maxHp: 2000, atk: 900, cooldown: 1, timer: 0, icon: '🔮', hasAttacked: false
                 };
-
-                activeBoard[ritaIdx] = fusionFighter;
                 activeBoard[joumanaIdx] = null;
-                this.showBanner(`🔥 FUSION ACTIVATED: Nightmare Duo unleashed!`);
                 this.syncState();
                 this.updateUI();
                 return true;
@@ -892,18 +690,12 @@
                 const f = activeBoard[index];
                 if (!f || f.timer > 0) return;
 
-                // Immediately set the cooldown on trigger to prevent multi-activations
-                f.timer = f.cooldown;
-
                 if (f.id === 'brahim') {
                     this.activePiFighter = f;
                     this.openModal('piModal');
                     return;
                 }
-
-                if (this.executeAbility(player, index)) {
-                    this.sendAction({ type: 'ABILITY', player, index });
-                }
+                if (this.executeAbility(player, index)) this.sendAction({ type: 'ABILITY', player, index });
             },
 
             executeAbility(player, index, piBonus = null) {
@@ -911,57 +703,52 @@
                 const enemyBoard = player === 'p1' ? this.state.p2Active : this.state.p1Active;
                 const f = activeBoard[index];
                 if (!f) return false;
-
-                // Ensure the timer is locked to the card's cooldown
                 f.timer = f.cooldown;
 
-                if (f.id === 'nightmare_duo') {
-                    f.hp = Math.min(f.maxHp, f.hp + 500);
-                    f.atk += 300;
-                    this.playCutscene('🔮', 'NIGHTMARE FURY', '+300 ATK & +500 HP Restored!');
-                } else if (f.id === 'ghizel') {
+                if (f.id === 'ghizel') {
                     f.hp = Math.min(f.maxHp, f.hp + Math.round(f.maxHp * 0.25));
                     f.atk *= 3;
-                    this.playCutscene('👑', 'PRINCIPAL DECREE', 'Miss Ghizel heals 25% HP & 3x DMG!');
-                } else if (f.id === 'brahim') {
-                    if (piBonus) {
-                        f.atk = Math.round(f.atk * piBonus);
-                        this.playCutscene('📐', 'PI RECITATION', `Accuracy Bonus Applied! ${Math.round((piBonus - 1) * 100)}% ATK Boost!`);
-                    }
+                    this.playCutscene('👑', 'PRINCIPAL DECREE', 'Ghizel heals 25% HP & 3x DMG!');
+                } else if (f.id === 'brahim' && piBonus) {
+                    f.atk = Math.round(f.atk * piBonus);
+                    this.playCutscene('📐', 'PI RECITATION', `ATK boosted by Pi digits!`);
                 } else if (f.id === 'rawa') {
                     this.state.frozenTurns = 2;
-                    this.playCutscene('🛑', 'SHUT UP!', 'Enemies frozen for 2 turns!');
+                    this.playCutscene('🛑', 'SHUT UP!', 'Enemy turn actions frozen for 2 turns!');
                 } else if (f.id === 'lila') {
-                    const enemyFighters = enemyBoard.filter(x => x !== null);
-                    if (enemyFighters.length > 0) {
-                        const target = enemyFighters[0];
+                    const targets = enemyBoard.filter(x => x !== null);
+                    if (targets.length > 0) {
+                        const target = targets[0];
                         const stolen = Math.round(target.hp * 0.5);
                         target.hp -= stolen;
                         f.hp = Math.min(f.maxHp, f.hp + stolen);
                         this.playCutscene('📝', 'WRITTEN QUIZ', `Stole ${stolen} HP from enemy!`);
                     }
                 } else if (f.id === 'joumana') {
-                    const sacrifice = Math.round(f.hp * 0.3);
-                    f.hp -= sacrifice;
+                    const cost = Math.round(f.hp * 0.3);
+                    f.hp = Math.max(1, f.hp - cost);
                     f.atk = Math.round(f.atk * 1.7);
-                    this.showBanner(`⚠️ WARNING: Sacrificed ${sacrifice} HP for +70% ATK!`);
+                    this.playCutscene('⚠️', 'WARNING SLIP', 'Sacrificed HP for +70% ATK boost!');
                 } else if (f.id === 'lilan') {
                     f.atk += 400;
-                    this.showBanner(`🌿 CLOUD PLANTS: +400 extra ATK!`);
+                    this.playCutscene('🌿', 'CLOUD PLANTS', 'Gained +400 bonus strike power!');
                 } else if (f.id === 'kameel') {
-                    this.state.frozenTurns = 1;
                     f.atk *= 2;
-                    this.showBanner(`🐸 FROG EYES: Double ATK & skip enemy turn!`);
+                    this.state.frozenTurns = 1;
+                    this.playCutscene('🐸', 'FROG EYES', '2x ATK & skipped enemy upcoming turn!');
                 } else if (f.id === 'maher') {
                     this.state.frozenTurns = 1;
-                    this.showBanner(`🗣️ TALKS TOO MUCH: Enemy turn skipped!`);
+                    this.playCutscene('🗣️', 'TALKS TOO MUCH', 'Forced enemy to skip next turn!');
                 } else if (f.id === 'nada') {
                     f.atk *= 2;
-                    this.showBanner(`⚡ DOUBLE ATTACK: Double strike!`);
+                    this.playCutscene('⚡', 'DOUBLE STRIKE', 'Unleashed double strike power!');
+                } else if (f.id === 'nightmare_duo') {
+                    f.hp = Math.min(f.maxHp, f.hp + 500);
+                    f.atk += 300;
+                    this.playCutscene('🔮', 'DUO OVERLOAD', '+500 HP restored & +300 permanent ATK!');
                 } else {
                     SoundFX.play('ability');
                 }
-
                 this.syncState();
                 this.updateUI();
                 return true;
@@ -974,23 +761,14 @@
                 const f = activeBoard[index];
                 if (!f) return;
                 
-                if (f.timer === 0) {
-                    this.triggerAbility(index);
-                    return;
-                }
-
-                if (f.hasAttacked) { alert("Already attacked this turn!"); return; }
-                if (this.state.attacksRemaining <= 0) { alert("No attacks remaining!"); return; }
+                if (f.timer === 0) { this.triggerAbility(index); return; }
+                if (f.hasAttacked || this.state.attacksRemaining <= 0) return;
 
                 const activeEnemyCount = enemyBoard.filter(x => x !== null).length;
-                this.pendingAttackSlot = index;
-
                 if (activeEnemyCount > 0) {
                     let html = '';
                     enemyBoard.forEach((ef, ei) => {
-                        if (ef) {
-                            html += `<button class="btn" style="background:#1e293b; justify-content:space-between;" onclick="GameEngine.executeAttack(${index}, 'enemy_fighter', ${ei})"><span>⚔️ ${ef.name}</span> <span>HP: ${ef.hp}/${ef.maxHp}</span></button>`;
-                        }
+                        if (ef) html += `<button class="btn" style="background:#1e293b; justify-content:space-between;" onclick="GameEngine.executeAttack(${index}, 'enemy_fighter', ${ei})"><span>⚔️ ${ef.name}</span> <span>HP: ${ef.hp}/${ef.maxHp}</span></button>`;
                     });
                     document.getElementById('targetList').innerHTML = html;
                     this.openModal('targetModal');
@@ -1009,66 +787,35 @@
             executeAttackLogic(attackerIdx, targetType, targetIdx, player) {
                 const attackerBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
                 const defenderBoard = player === 'p1' ? this.state.p2Active : this.state.p1Active;
+                const isOpponentEvading = player === 'p1' ? this.state.p2Evade : this.state.p1Evade;
+
                 const attacker = attackerBoard[attackerIdx];
                 if (!attacker || attacker.hasAttacked) return;
 
-                const isDefenderP1 = (player === 'p2');
-                const hasEvade = isDefenderP1 ? this.state.p1Evade : this.state.p2Evade;
-
-                if (hasEvade) {
-                    if (isDefenderP1) this.state.p1Evade = false;
-                    else this.state.p2Evade = false;
-
-                    const boardId = player === 'p1' ? 'opponentPanel' : 'playerPanel';
-                    this.spawnFloatingText(boardId, `EVADED!`, '#3b82f6');
-                    this.log(`💨 Attack was completely EVADED by the defender's Evade Support!`);
-                    
+                if (isOpponentEvading) {
+                    if (player === 'p1') this.state.p2Evade = false;
+                    else this.state.p1Evade = false;
+                    this.showBanner("💨 Attack Evaded by Support Trap!");
                     attacker.hasAttacked = true;
                     this.state.attacksRemaining--;
                     this.syncState();
                     this.updateUI();
-
-                    if (this.state.attacksRemaining <= 0 && this.state.turn === this.myRole) {
-                        setTimeout(() => this.endTurn(), 800);
-                    }
                     return;
                 }
 
                 SoundFX.play('attack');
                 this.triggerScreenShake();
                 let dmg = attacker.atk;
-                this.state.stats.damageDealt += dmg;
 
                 if (targetType === 'enemy_fighter') {
                     const defender = defenderBoard[targetIdx];
                     if (defender) {
                         defender.hp -= dmg;
-                        const boardId = player === 'p1' ? 'p2ActiveBoard' : 'p1ActiveBoard';
-                        const cardEl = document.getElementById(boardId)?.children[targetIdx];
-                        this.spawnSlashEffect(cardEl);
-                        this.spawnFloatingText(boardId, `-${dmg}`, '#ef4444');
-
-                        this.log(`${player === 'p1' ? 'P1' : 'P2'} ${attacker.name} hit ${defender.name} for ${dmg} DMG!`);
-                        if (defender.hp <= 0) {
-                            this.log(`Fighter ${defender.name} defeated!`);
-                            defenderBoard[targetIdx] = null;
-                        }
+                        if (defender.hp <= 0) defenderBoard[targetIdx] = null;
                     }
                 } else {
-                    if (player === 'p1') {
-                        this.state.p2Hp = Math.max(0, this.state.p2Hp - dmg);
-                        this.spawnFloatingText('opponentPanel', `-${dmg}`, '#ef4444');
-                    } else {
-                        this.state.p1Hp = Math.max(0, this.state.p1Hp - dmg);
-                        this.spawnFloatingText('playerPanel', `-${dmg}`, '#ef4444');
-                    }
-                    this.log(`${player === 'p1' ? 'P1' : 'P2'} ${attacker.name} attacked opponent directly for ${dmg} DMG!`);
-                    
-                    if (this.state.p1Hp <= 0 || this.state.p2Hp <= 0) {
-                        const isWin = (this.myRole === 'p1' && this.state.p2Hp <= 0) || (this.myRole === 'p2' && this.state.p1Hp <= 0);
-                        this.triggerGameOver(isWin);
-                        return;
-                    }
+                    if (player === 'p1') this.state.p2Hp = Math.max(0, this.state.p2Hp - dmg);
+                    else this.state.p1Hp = Math.max(0, this.state.p1Hp - dmg);
                 }
 
                 attacker.hasAttacked = true;
@@ -1076,79 +823,86 @@
                 this.syncState();
                 this.updateUI();
 
+                if ((this.state.p1Hp <= 0 || this.state.p2Hp <= 0) && !this.gameOverTriggered) {
+                    this.gameOverTriggered = true;
+                    const win = (player === 'p1' && this.state.p2Hp <= 0) || (player === 'p2' && this.state.p1Hp <= 0);
+                    document.getElementById('winTitle').innerText = win ? "VICTORY!" : "DEFEAT!";
+                    document.getElementById('winSub').innerText = win ? "You dominated the arena!" : "Better luck next time!";
+                    this.openModal('gameOverModal');
+                    return;
+                }
+
                 if (this.state.attacksRemaining <= 0 && this.state.turn === this.myRole) {
                     setTimeout(() => this.endTurn(), 800);
                 }
             },
 
-            useSupport(player, index) {
-                if (player !== this.myRole) return;
+            useSupport(index) {
+                if (this.state.turn !== this.myRole) { alert("Not your turn!"); return; }
+                const player = this.myRole;
                 const supports = player === 'p1' ? this.state.p1Supports : this.state.p2Supports;
                 const supp = supports[index];
-                if (supp.used) return;
-
-                supp.used = true;
-                SoundFX.play('ability');
-                this.log(`Support Trap Flipped: ${supp.symbol} ${supp.name}!`);
+                if (!supp || supp.used) return;
 
                 if (supp.id === 'heal') {
-                    let html = `<button class="btn" onclick="GameEngine.resolveHeal('player', 0)">💖 Restore 600 Player HP</button>`;
-                    const myActive = player === 'p1' ? this.state.p1Active : this.state.p2Active;
-                    myActive.forEach((f, fi) => {
-                        if (f) html += `<button class="btn" style="background:#1e293b;" onclick="GameEngine.resolveHeal('fighter', ${fi})">💖 Heal ${f.name} (+600 HP)</button>`;
+                    this.pendingSupportIdx = index;
+                    const myBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    let html = `<button class="btn btn-green" onclick="GameEngine.applyHealSupport('player', 0)">💖 Heal Main Leader (+600 HP)</button>`;
+                    myBoard.forEach((f, i) => {
+                        if (f) html += `<button class="btn btn-blue" onclick="GameEngine.applyHealSupport('fighter', ${i})">💖 Heal ${f.name} (+600 HP)</button>`;
                     });
                     document.getElementById('healList').innerHTML = html;
                     this.openModal('healModal');
-                } else {
-                    this.executeSupport(player, index, 'none', 0);
-                    this.sendAction({ type: 'SUPPORT', player, index, targetType: 'none', targetIdx: 0 });
+                    return;
                 }
+
+                supp.used = true;
+                this.executeSupport(player, index, 'none', 0);
+                this.sendAction({ type: 'SUPPORT', player, index, targetType: 'none', targetIdx: 0 });
             },
 
-            resolveHeal(targetType, idx) {
+            applyHealSupport(targetType, targetIdx) {
                 this.closeModal('healModal');
                 const player = this.myRole;
-                this.executeSupport(player, 0, targetType, idx);
-                this.sendAction({ type: 'SUPPORT', player, index: 0, targetType, targetIdx: idx });
+                const idx = this.pendingSupportIdx;
+                const supports = player === 'p1' ? this.state.p1Supports : this.state.p2Supports;
+                if (supports[idx]) supports[idx].used = true;
+                this.executeSupport(player, idx, targetType, targetIdx);
+                this.sendAction({ type: 'SUPPORT', player, index: idx, targetType, targetIdx });
             },
 
             executeSupport(player, index, targetType, targetIdx) {
                 const supports = player === 'p1' ? this.state.p1Supports : this.state.p2Supports;
                 const supp = supports[index];
-                if (supp) supp.used = true;
+                if (!supp) return;
+                supp.used = true;
 
-                if (supp && supp.id === 'evade') {
+                if (supp.id === 'heal') {
+                    if (targetType === 'player') {
+                        if (player === 'p1') this.state.p1Hp = Math.min(3000, this.state.p1Hp + 600);
+                        else this.state.p2Hp = Math.min(3000, this.state.p2Hp + 600);
+                    } else {
+                        const board = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                        if (board[targetIdx]) board[targetIdx].hp = Math.min(board[targetIdx].maxHp, board[targetIdx].hp + 600);
+                    }
+                    this.showBanner("💖 Support Heal Applied!");
+                } else if (supp.id === 'evade') {
                     if (player === 'p1') this.state.p1Evade = true;
                     else this.state.p2Evade = true;
-                    this.showBanner(`💨 EVADE SUPPORT ACTIVATED: Will dodge the next attack!`);
-                } else if (targetType === 'player') {
-                    if (player === 'p1') {
-                        this.state.p1Hp = Math.min(3000, this.state.p1Hp + 600);
-                        this.spawnFloatingText('playerPanel', `+600`, '#10b981');
-                    } else {
-                        this.state.p2Hp = Math.min(3000, this.state.p2Hp + 600);
-                        this.spawnFloatingText('opponentPanel', `+600`, '#10b981');
-                    }
-                } else if (targetType === 'fighter') {
-                    const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
-                    const f = activeBoard[targetIdx];
-                    if (f) {
-                        f.hp = Math.min(f.maxHp, f.hp + 600);
-                        const boardId = player === 'p1' ? 'p1ActiveBoard' : 'p2ActiveBoard';
-                        this.spawnFloatingText(boardId, `+600`, '#10b981');
-                    }
-                } else if (supp && supp.id === 'bell') {
-                    const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
-                    activeBoard.forEach(f => { if (f) f.timer = 0; });
-                    this.showBanner(`🔔 SCHOOL BELL: Cooldowns reset!`);
-                } else if (supp && supp.id === 'extra') {
-                    const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
-                    activeBoard.forEach(f => { if (f) f.atk += 200; });
-                    this.showBanner(`⚡ EXTRA CREDIT: Active fighters gain +200 ATK!`);
-                } else if (supp && supp.id === 'detention') {
+                    this.showBanner("💨 Evade Trap Primed!");
+                } else if (supp.id === 'extra') {
+                    const board = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    board.forEach(f => { if (f) f.atk += 200; });
+                    this.showBanner("⚡ Extra Credit: +200 ATK to all active fighters!");
+                } else if (supp.id === 'detention') {
                     this.state.frozenTurns = 1;
-                    this.showBanner(`🛑 DETENTION SLIP: Opponent turn skipped!`);
+                    this.showBanner("🛑 Detention Slip: Opponent turn will be skipped!");
+                } else if (supp.id === 'bell') {
+                    const board = player === 'p1' ? this.state.p1Active : this.state.p2Active;
+                    board.forEach(f => { if (f) f.timer = 0; });
+                    this.showBanner("🔔 School Bell: All Cooldowns Resetted!");
                 }
+
                 this.syncState();
                 this.updateUI();
             },
@@ -1161,16 +915,12 @@
             },
 
             executeEndTurn(player) {
-                this.log(`Ending ${player === 'p1' ? 'P1' : 'P2'} turn...`);
-                
                 const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
-                activeBoard.forEach(f => { 
-                    if (f && f.timer > 0) f.timer--; 
-                });
+                activeBoard.forEach(f => { if (f && f.timer > 0) f.timer--; });
 
                 if (this.state.frozenTurns > 0) {
                     this.state.frozenTurns--;
-                    this.log(`Next turn is frozen! Turn skipped.`);
+                    this.showBanner("🛑 Turn Skipped due to Effect/Trap!");
                     this.state.attacksRemaining = 2;
                     activeBoard.forEach(f => { if (f) f.hasAttacked = false; });
                 } else {
@@ -1184,76 +934,59 @@
                 this.updateUI();
 
                 if (!this.isOnline && this.state.turn === 'p2') {
-                    setTimeout(() => this.runBotTurn(), 1200);
+                    setTimeout(() => this.runBotTurn(), 1000);
                 }
             },
 
             runBotTurn() {
-                this.state.stats.turns++;
-
-                // Decrement bot's active fighter timers
-                this.state.p2Active.forEach(f => {
-                    if (f && f.timer > 0) f.timer--;
-                });
-
-                if (this.state.frozenTurns > 0) {
-                    this.log(`Opponent is frozen (${this.state.frozenTurns} turns left)! Turn skipped.`);
-                    this.state.frozenTurns--;
-                    this.state.turn = 'p1';
-                    this.state.attacksRemaining = 2;
-                    this.state.p1Active.forEach(f => { if (f) f.hasAttacked = false; });
-                    this.updateUI();
-                    return;
-                }
-
+                this.state.p2Active.forEach(f => { if (f && f.timer > 0) f.timer--; });
                 while (this.state.p2Active.includes(null) && this.state.p2Hand.length > 0) {
                     const emptyIdx = this.state.p2Active.indexOf(null);
-                    const f = this.state.p2Hand.pop();
-                    this.state.p2Active[emptyIdx] = { ...f, hasAttacked: false, timer: 0 };
+                    this.state.p2Active[emptyIdx] = { ...this.state.p2Hand.pop(), hasAttacked: false, timer: 0 };
+                }
+
+                if (this.state.p2Supports.length > 0) {
+                    const unused = this.state.p2Supports.filter(s => !s.used);
+                    if (unused.length > 0 && Math.random() < 0.5) {
+                        const supp = unused[0];
+                        const suppIdx = this.state.p2Supports.indexOf(supp);
+                        this.executeSupport('p2', suppIdx, 'player', 0);
+                    }
                 }
 
                 this.state.p2Active.forEach((botFighter) => {
                     if (!botFighter) return;
-                    const activePlayerFighters = this.state.p1Active.filter(x => x !== null);
-                    if (activePlayerFighters.length > 0) {
-                        const targetIdx = this.state.p1Active.findIndex(x => x !== null);
-                        if (targetIdx !== -1) {
-                            const target = this.state.p1Active[targetIdx];
-                            target.hp -= botFighter.atk;
-                            this.triggerScreenShake();
-                            this.spawnFloatingText('p1ActiveBoard', `-${botFighter.atk}`, '#ef4444');
-                            this.log(`Bot hit your ${target.name} for ${botFighter.atk} DMG!`);
-                            if (target.hp <= 0) this.state.p1Active[targetIdx] = null;
-                        }
+                    if (this.state.p1Evade) {
+                        this.state.p1Evade = false;
+                        this.showBanner("💨 Bot's attack was Evaded!");
+                        return;
+                    }
+                    const targetIdx = this.state.p1Active.findIndex(x => x !== null);
+                    if (targetIdx !== -1) {
+                        this.state.p1Active[targetIdx].hp -= botFighter.atk;
+                        if (this.state.p1Active[targetIdx].hp <= 0) this.state.p1Active[targetIdx] = null;
                     } else {
                         this.state.p1Hp = Math.max(0, this.state.p1Hp - botFighter.atk);
-                        this.triggerScreenShake();
-                        this.spawnFloatingText('playerPanel', `-${botFighter.atk}`, '#ef4444');
-                        if (this.state.p1Hp <= 0) {
-                            this.triggerGameOver(false);
-                            return;
-                        }
                     }
                 });
 
-                if (this.state.p1Hp > 0) {
-                    this.state.turn = 'p1';
-                    this.state.attacksRemaining = 2;
-                    this.state.p1Active.forEach(f => { if (f) f.hasAttacked = false; });
-                    this.log("Your turn started!");
+                if (this.state.p1Hp <= 0 && !this.gameOverTriggered) {
+                    this.gameOverTriggered = true;
+                    document.getElementById('winTitle').innerText = "DEFEAT!";
+                    document.getElementById('winSub').innerText = "AI Bot overwhelmed your defenses!";
+                    this.openModal('gameOverModal');
+                    return;
                 }
+
+                this.state.turn = 'p1';
+                this.state.attacksRemaining = 2;
+                this.state.p1Active.forEach(f => { if (f) f.hasAttacked = false; });
                 this.updateUI();
             },
 
             submitPi() {
                 const val = document.getElementById('piInput').value.trim();
-                const correctPi = "1415926535";
-                let correctCount = 0;
-                for (let i = 0; i < val.length; i++) {
-                    if (val[i] === correctPi[i]) correctCount++;
-                    else break;
-                }
-                const bonus = 1 + (correctCount * 0.2);
+                const bonus = 1 + (val.length * 0.2);
                 if (this.activePiFighter) {
                     const player = this.myRole;
                     const activeBoard = player === 'p1' ? this.state.p1Active : this.state.p2Active;
@@ -1264,30 +997,11 @@
                 this.closeModal('piModal');
             },
 
-            triggerGameOver(isWin) {
-                const title = document.getElementById('winTitle');
-                const sub = document.getElementById('winSub');
-                const stats = document.getElementById('gameStats');
-                if (isWin) {
-                    title.innerText = "VICTORY!";
-                    title.style.color = "var(--accent-green)";
-                    sub.innerText = "You reduced opponent HP to zero!";
-                } else {
-                    title.innerText = "DEFEAT";
-                    title.style.color = "var(--accent-red)";
-                    sub.innerText = "Your HP reached zero!";
-                }
-                stats.innerText = `Total Turns: ${this.state.stats.turns} | Total DMG: ${this.state.stats.damageDealt}`;
-                this.openModal('gameOverModal');
-            },
-
             resetToMenu() {
-                if (this.conn) this.conn.close();
-                if (this.peer) this.peer.destroy();
+                MQTTRelay.disconnect();
                 this.closeModal('gameOverModal');
                 document.getElementById('gameScreen').classList.add('hidden');
                 document.getElementById('lobbyScreen').classList.remove('hidden');
-                document.getElementById('statusBadge').innerText = "Main Menu";
             },
 
             updateUI() {
@@ -1295,105 +1009,73 @@
                 const myActive = this.myRole === 'p1' ? this.state.p1Active : this.state.p2Active;
                 const opponentActive = this.myRole === 'p1' ? this.state.p2Active : this.state.p1Active;
                 const myHand = this.myRole === 'p1' ? this.state.p1Hand : this.state.p2Hand;
+                const mySupports = this.myRole === 'p1' ? this.state.p1Supports : this.state.p2Supports;
                 const myHp = this.myRole === 'p1' ? this.state.p1Hp : this.state.p2Hp;
                 const opponentHp = this.myRole === 'p1' ? this.state.p2Hp : this.state.p1Hp;
 
-                const myPct = (myHp / 3000) * 100;
-                const oppPct = (opponentHp / 3000) * 100;
-                document.getElementById('p1HpBar').style.width = myPct + '%';
+                document.getElementById('p1HpBar').style.width = (myHp / 3000 * 100) + '%';
                 document.getElementById('p1HpText').innerText = myHp;
-                document.getElementById('p2HpBar').style.width = oppPct + '%';
+                document.getElementById('p2HpBar').style.width = (opponentHp / 3000 * 100) + '%';
                 document.getElementById('p2HpText').innerText = opponentHp;
 
-                const chanceLabel = document.getElementById('sTierChanceLabel');
-                if (chanceLabel) {
-                    chanceLabel.innerText = "6% S-TIER CHANCE";
-                }
-                
-                const roleLabel = document.getElementById('myRoleLabel');
-                if (roleLabel) roleLabel.innerText = this.myRole === 'p1' ? 'Player 1' : 'Player 2';
-
                 const turnBanner = document.getElementById('turnBannerText');
-                const endBtn = document.getElementById('endTurnBtn');
-                if (isMyTurn) {
-                    turnBanner.innerText = `YOUR TURN (${this.state.attacksRemaining} ATTACKS REMAINING)`;
-                    turnBanner.style.color = '#f59e0b';
-                    endBtn.disabled = false;
-                } else {
-                    turnBanner.innerText = "OPPONENT TURN...";
-                    turnBanner.style.color = '#ef4444';
-                    endBtn.disabled = true;
-                }
+                turnBanner.innerText = isMyTurn ? `YOUR TURN (${this.state.attacksRemaining} ATTACKS LEFT)` : "OPPONENT TURN...";
+                document.getElementById('endTurnBtn').disabled = !isMyTurn;
 
-                const mySupports = this.myRole === 'p1' ? this.state.p1Supports : this.state.p2Supports;
-                let p1SupHtml = '';
-                mySupports.forEach((s, i) => {
-                    p1SupHtml += `<div class="support-card ${s.used ? 'used' : ''}" onclick="GameEngine.useSupport('${this.myRole}', ${i})">${s.symbol}</div>`;
-                });
-                document.getElementById('p1Supports').innerHTML = p1SupHtml;
-
+                const ritaActive = myActive.some(f => f && f.id === 'rita');
+                const joumanaActive = myActive.some(f => f && f.id === 'joumana');
                 const fusionBtn = document.getElementById('fusionBtn');
-                if (fusionBtn) {
-                    const hasRita = myActive.some(f => f && f.id === 'rita');
-                    const hasJoumana = myActive.some(f => f && f.id === 'joumana');
-                    fusionBtn.style.display = (hasRita && hasJoumana) ? 'inline-flex' : 'none';
+                if (ritaActive && joumanaActive) {
+                    fusionBtn.style.display = 'inline-flex';
+                } else {
+                    fusionBtn.style.display = 'none';
                 }
 
                 let p1BoardHtml = '';
                 myActive.forEach((f, i) => {
                     if (f) {
-                        const isReady = f.timer === 0;
-                        p1BoardHtml += `
-                            <div class="vertical-card tier-border-${f.tier} ${isReady ? 'ability-ready-pulse' : ''}" onclick="GameEngine.clickActiveFighter(${i})">
-                                <div class="card-top-row">
-                                    <span class="card-tier-tag ${f.tier}">${f.tier}-TIER</span>
-                                    <span class="card-atk-tag">ATK: ${f.atk}</span>
-                                </div>
-                                <div style="font-size: 22px; margin-top:2px;">${f.icon || '⚔️'}</div>
-                                <div class="card-title-main">${f.name}</div>
-                                <div class="card-hp-footer">HP: ${f.hp}/${f.maxHp}</div>
-                                ${f.timer > 0 ? `<div class="cooldown-badge">CD: ${f.timer}T</div>` : ''}
-                            </div>`;
-                    } else {
-                        p1BoardHtml += `<div class="empty-slot">Slot ${i + 1}</div>`;
-                    }
+                        const readyClass = f.timer === 0 ? 'ability-ready-pulse' : '';
+                        const cdBadge = f.timer > 0 ? `<div class="cooldown-badge">CD: ${f.timer}T</div>` : `<div class="cooldown-badge" style="color:#4ade80; background:rgba(74,222,128,0.15); border-color:rgba(74,222,128,0.4);">READY</div>`;
+                        p1BoardHtml += `<div class="vertical-card tier-border-${f.tier} ${readyClass}" onclick="GameEngine.clickActiveFighter(${i})">
+                            <div class="card-top-row"><span class="card-tier-tag ${f.tier}">${f.tier}</span><span>ATK: ${f.atk}</span></div>
+                            <div style="font-size:22px;">${f.icon}</div>
+                            <div class="card-title-main">${f.name}</div>
+                            <div class="card-hp-footer">HP: ${f.hp}/${f.maxHp}</div>
+                            ${cdBadge}
+                        </div>`;
+                    } else p1BoardHtml += `<div class="empty-slot">Slot ${i + 1}</div>`;
                 });
                 document.getElementById('p1ActiveBoard').innerHTML = p1BoardHtml;
 
                 let p2BoardHtml = '';
                 opponentActive.forEach((f, i) => {
                     if (f) {
-                        p2BoardHtml += `
-                            <div class="vertical-card tier-border-${f.tier}">
-                                <div class="card-top-row">
-                                    <span class="card-tier-tag ${f.tier}">${f.tier}-TIER</span>
-                                    <span class="card-atk-tag">ATK: ${f.atk}</span>
-                                </div>
-                                <div style="font-size: 22px; margin-top:2px;">${f.icon || '⚔️'}</div>
-                                <div class="card-title-main">${f.name}</div>
-                                <div class="card-hp-footer">HP: ${f.hp}/${f.maxHp}</div>
-                                ${f.timer > 0 ? `<div class="cooldown-badge">CD: ${f.timer}T</div>` : ''}
-                            </div>`;
-                    } else {
-                        p2BoardHtml += `<div class="empty-slot">Slot ${i + 1}</div>`;
-                    }
-                });
-                document.getElementById('p2ActiveBoard').innerHTML = p2BoardHtml;
-
-                let handHtml = '';
-                myHand.forEach((f, i) => {
-                    handHtml += `
-                        <div class="vertical-card tier-border-${f.tier}" style="min-width: 105px; max-width: 105px;" onclick="GameEngine.deployFighter(${i})">
-                            <div class="card-top-row">
-                                <span class="card-tier-tag ${f.tier}">${f.tier}-TIER</span>
-                                <span class="card-atk-tag">ATK: ${f.atk}</span>
-                            </div>
-                            <div style="font-size: 20px; margin-top:2px;">${f.icon || '⚔️'}</div>
+                        p2BoardHtml += `<div class="vertical-card tier-border-${f.tier}">
+                            <div class="card-top-row"><span class="card-tier-tag ${f.tier}">${f.tier}</span><span>ATK: ${f.atk}</span></div>
+                            <div style="font-size:22px;">${f.icon}</div>
                             <div class="card-title-main">${f.name}</div>
                             <div class="card-hp-footer">HP: ${f.hp}/${f.maxHp}</div>
                         </div>`;
+                    } else p2BoardHtml += `<div class="empty-slot">Slot ${i + 1}</div>`;
                 });
-                document.getElementById('p1HandBoard').innerHTML = handHtml || '<div style="color: #6b7280; font-size: 11px; padding: 10px;">No reserve cards left.</div>';
+                document.getElementById('p2ActiveBoard').innerHTML = p2BoardHtml;
+
+                let suppHtml = '';
+                mySupports.forEach((s, i) => {
+                    suppHtml += `<div class="support-card ${s.used ? 'used' : ''}" onclick="GameEngine.useSupport(${i})" title="${s.name}">${s.symbol}</div>`;
+                });
+                document.getElementById('p1Supports').innerHTML = suppHtml;
+
+                let handHtml = '';
+                myHand.forEach((f, i) => {
+                    handHtml += `<div class="vertical-card tier-border-${f.tier}" style="min-width:105px;" onclick="GameEngine.deployFighter(${i})">
+                        <div class="card-top-row"><span class="card-tier-tag ${f.tier}">${f.tier}</span><span>ATK: ${f.atk}</span></div>
+                        <div style="font-size:20px;">${f.icon}</div>
+                        <div class="card-title-main">${f.name}</div>
+                        <div class="card-hp-footer">HP: ${f.hp}/${f.maxHp}</div>
+                    </div>`;
+                });
+                document.getElementById('p1HandBoard').innerHTML = handHtml || '<div style="color:#6b7280; font-size:11px;">Hand Empty</div>';
             }
         };
     </script>
