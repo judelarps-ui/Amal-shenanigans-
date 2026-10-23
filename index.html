@@ -575,13 +575,14 @@
                         iceServers: [
                             { urls: 'stun:stun.l.google.com:19302' },
                             { urls: 'stun:stun1.l.google.com:19302' },
-                            { urls: 'stun:openrelay.metered.ca:80' },
-                            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-                            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            { urls: 'stun:stun3.l.google.com:19302' },
+                            { urls: 'stun:stun4.l.google.com:19302' },
+                            { urls: 'stun:global.stun.twilio.com:3478' }
                         ],
-                        sdpSemantics: 'unified-plan'
+                        iceCandidatePoolSize: 10
                     },
-                    debug: 0
+                    debug: 1
                 };
             },
 
@@ -612,15 +613,12 @@
                     });
 
                     this.peer.on('connection', (connection) => {
-                        if (this.conn) {
-                            try { this.conn.close(); } catch(e){}
-                        }
                         this.conn = connection;
+                        this.setupPeerListeners();
                         document.getElementById('statusBadge').innerText = "Online Connected!";
                         document.getElementById('p2NameLabel').innerText = "Player 2 (Online)";
-                        this.setupPeerListeners();
-                        setTimeout(() => this.syncState(), 400);
                         this.log("Player 2 connected!");
+                        setTimeout(() => this.syncState(), 500);
                     });
 
                     this.peer.on('error', (err) => {
@@ -658,16 +656,19 @@
                             joinBtn.disabled = false;
                             joinBtn.innerText = "Join";
                         }
-                        alert("Timed out connecting to room " + code + ". Please ensure the host has the room open.");
-                    }, 10000);
+                        alert("Connection timed out. Make sure the host has the room open and active on screen.");
+                    }, 18000);
 
                     this.peer.on('open', () => {
-                        this.conn = this.peer.connect(targetPeerId, { 
+                        const conn = this.peer.connect(targetPeerId, { 
                             reliable: true
                         });
+                        this.conn = conn;
                         this.isHost = false;
                         this.isOnline = true;
                         this.myRole = 'p2';
+
+                        this.setupPeerListeners();
 
                         this.conn.on('open', () => {
                             clearTimeout(timeoutTimer);
@@ -680,7 +681,6 @@
                             document.getElementById('gameScreen').classList.remove('hidden');
                             document.getElementById('statusBadge').innerText = "Online Connected!";
                             document.getElementById('p2NameLabel').innerText = "Host (Player 1)";
-                            this.setupPeerListeners();
                         });
 
                         this.conn.on('error', (err) => {
